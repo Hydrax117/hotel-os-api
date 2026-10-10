@@ -1,118 +1,291 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Hotel OS API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+> The NestJS backend for Hotel OS — a two-sided hospitality platform built for Nigeria and Africa.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Architecture Overview
 
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
-
-```bash
-$ npm install
+```
+hotel-os (Next.js frontend)     → http://localhost:3000
+hotel-os-api (NestJS backend)   → http://localhost:3001
 ```
 
-## Compile and run the project
+The frontend and backend are separate repositories. The frontend currently uses mock data and is wired up module by module as each API module is completed.
 
-```bash
-# development
-$ npm run start
+## What is Hotel OS?
 
-# watch mode
-$ npm run start:dev
+Hotel OS is a two-sided hospitality marketplace:
 
-# production mode
-$ npm run start:prod
+- **Hotel side** — Hotels register, go through a verification/approval process, then manage their inventory (room types, physical rooms, availability calendar), handle reservations, view occupancy analytics, and receive payouts.
+- **Traveler side** — Travelers search for hotels by city/date/guests, view hotel and room detail pages, complete checkout, and manage their booking history.
+- **Admin** — Platform administrators approve new hotel registrations, verify documentation, monitor platform-wide analytics, manage subscriptions, handle disputes, and oversee payouts.
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | NestJS 12 + TypeScript 6 (ESM modules) |
+| Database | PostgreSQL + Prisma ORM |
+| Queues | Redis + BullMQ (not yet implemented) |
+| Auth | JWT — access token 15 min + refresh token 7 days |
+| Payments | Paystack (not yet implemented) |
+| Testing | Vitest |
+| API Docs | Swagger / OpenAPI at `/api/docs` |
+
+## Project Structure
+
+```
+hotel-os-api/
+  src/
+    auth/           ✅ Complete — register, login, refresh, logout, me
+    users/          ✅ Complete — profile get/update
+    prisma/         ✅ Complete — global PrismaService
+    hotels/         🔄 In progress — CRUD, verification, admin approval
+    rooms/          ⬜ Pending
+    inventory/      ⬜ Pending
+    search/         ⬜ Pending
+    bookings/       ⬜ Pending
+    payments/       ⬜ Pending
+    reviews/        ⬜ Pending
+    subscriptions/  ⬜ Pending
+    notifications/  ⬜ Pending
+    admin/          ⬜ Pending
+    common/
+      utils/        Shared utilities (slug generation, etc.)
+  prisma/
+    schema.prisma   ✅ Complete — all 16 models defined
+    migrations/     Database migration history
+  test/             E2E tests
 ```
 
-## Run tests
+## Database Schema
+
+All 16 Prisma models and their purpose:
+
+| Model | Description |
+|---|---|
+| `User` | Platform users — travelers, hotel owners, hotel staff, admins |
+| `RefreshToken` | JWT refresh tokens stored hashed for rotation |
+| `Hotel` | Core hotel entity — details, location, verification status, subscription plan |
+| `HotelVerification` | Admin review record for hotel approval/rejection |
+| `HotelStaff` | Hotel team members linked to a hotel (managers, receptionists, staff) |
+| `HotelImage` | Hotel photo gallery with primary image flag |
+| `Amenity` | Platform amenity catalogue (WiFi, Pool, Gym, etc.) |
+| `HotelAmenity` | Many-to-many join between Hotel and Amenity |
+| `RoomType` | Room categories within a hotel (Deluxe King, Standard Twin, etc.) |
+| `Room` | Individual physical rooms, each assigned to a RoomType |
+| `InventoryDay` | Per-date availability tracking — held/booked unit counts and price overrides |
+| `Booking` | Guest reservation — links user, hotel, room type; includes all guest and pricing details |
+| `Payment` | Paystack payment record for a booking, including commission split |
+| `Refund` | Refund record linked to a payment |
+| `Subscription` | Hotel subscription billing record (plan, status, billing cycle) |
+| `Payout` | Hotel payout batches, made up of PayoutItems |
+| `PayoutItem` | Individual payment included in a payout batch |
+| `Review` | Verified post-stay review with 6 rating dimensions and hotel response |
+
+## Current API Endpoints
+
+Base URL: `http://localhost:3001/api/v1`
+
+### Auth
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/auth/register` | None | Register a new user |
+| POST | `/auth/login` | None | Login, returns access + refresh tokens |
+| POST | `/auth/refresh` | None | Exchange refresh token for new token pair |
+| POST | `/auth/logout` | Bearer | Invalidate all refresh tokens for the user |
+| GET | `/auth/me` | Bearer | Get the currently authenticated user |
+
+### Users
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/users/profile` | Bearer | Get the authenticated user's profile |
+| PATCH | `/users/profile` | Bearer | Update the authenticated user's profile |
+
+### Hotels (in progress)
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/hotels` | None | List approved published hotels (paginated, filterable) |
+| GET | `/hotels/my` | HOTEL_OWNER | Get the owner's hotel |
+| GET | `/hotels/admin/pending` | SUPER_ADMIN | List hotels pending verification |
+| GET | `/hotels/:id` | None | Get a hotel by ID |
+| GET | `/hotels/slug/:slug` | None | Get a hotel by slug (for public detail pages) |
+| POST | `/hotels` | HOTEL_OWNER | Create a new hotel (one per owner) |
+| PATCH | `/hotels/:id` | HOTEL_OWNER | Update hotel details |
+| PATCH | `/hotels/:id/verify` | SUPER_ADMIN | Approve, reject, or suspend a hotel |
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- PostgreSQL 14+
+- Redis (optional for now — required when queues are implemented)
+
+### Setup
 
 ```bash
-# unit tests
-$ npm run test
+# 1. Clone and install dependencies
+git clone <repo-url>
+cd hotel-os-api
+npm install
 
-# e2e tests
-$ npm run test:e2e
+# 2. Configure environment
+cp .env.example .env
+# Edit .env — at minimum set DATABASE_URL and the JWT secrets
 
-# test coverage
-$ npm run test:cov
+# 3. Run database migrations
+npx prisma migrate dev --name init
+
+# 4. Start the dev server (watches for changes)
+npm run start:dev
+
+# 5. Open Swagger API docs
+open http://localhost:3001/api/docs
 ```
 
-## Deployment
+## Environment Variables
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+Copy `.env.example` to `.env` and fill in the values:
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+| Variable | Description | Example |
+|---|---|---|
+| `DATABASE_URL` | PostgreSQL connection string | `postgresql://postgres:password@localhost:5432/hotel_os_dev` |
+| `JWT_SECRET` | Secret for signing access tokens | Any long random string |
+| `JWT_EXPIRES_IN` | Access token TTL | `15m` |
+| `JWT_REFRESH_SECRET` | Secret for signing refresh tokens (different from JWT_SECRET) | Any long random string |
+| `JWT_REFRESH_EXPIRES_IN` | Refresh token TTL | `7d` |
+| `PORT` | Port the API server listens on | `3001` |
+| `NODE_ENV` | Environment flag | `development` |
+| `FRONTEND_URL` | Frontend origin for CORS | `http://localhost:3000` |
+| `PAYSTACK_SECRET_KEY` | Paystack secret key (payments — not yet active) | `sk_test_xxx` |
+| `PAYSTACK_PUBLIC_KEY` | Paystack public key | `pk_test_xxx` |
+| `PLATFORM_COMMISSION_PERCENT` | Platform commission on each payment | `10` |
+| `SERVICE_FEE_PERCENT` | Service fee charged to the traveler | `3` |
+
+## Development Workflow
+
+Each module follows this build pattern:
+
+1. **Schema change** — If the module needs new fields or models, write a Prisma migration:
+   ```bash
+   npx prisma migrate dev --name add-<feature>
+   ```
+2. **Service** — Write the business logic in `src/<module>/<module>.service.ts`. Inject `PrismaService` and `ConfigService`. No HTTP concerns here.
+3. **Controller** — Expose HTTP endpoints in `src/<module>/<module>.controller.ts`. Use guards and decorators.
+4. **Module** — Wire everything in `src/<module>/<module>.module.ts` and add the module to `AppModule`.
+5. **Swagger** — Test the new endpoints at `http://localhost:3001/api/docs`.
+6. **Frontend wiring** — Update the corresponding Next.js page to call the real API endpoint instead of importing mock data.
+7. **Remove mock** — Delete or archive the `mock.ts` file from the frontend page directory.
+
+## Module Build Order (Roadmap)
+
+Modules must be built in dependency order. A module that depends on another (e.g. Bookings depends on Inventory, Rooms, and Hotels) should not be started until its dependencies are complete.
+
+```
+✅ Auth module        — JWT auth, roles, refresh tokens
+✅ Users module       — profile management  
+🔄 Hotels module      — hotel CRUD, verification, admin approval
+⬜ Rooms module       — room types, physical rooms
+⬜ Inventory module   — date-based availability, holds
+⬜ Search module      — availability search (traveler-facing)
+⬜ Bookings module    — reservation state machine, temporary holds
+⬜ Payments module    — Paystack integration, webhooks
+⬜ Reviews module     — verified post-stay reviews
+⬜ Subscriptions      — billing, grace period, suspension
+⬜ Notifications      — email and WhatsApp delivery via BullMQ
+⬜ Admin module       — platform management endpoints
+```
+
+## Key Patterns
+
+### ESM imports
+This project uses ESM modules. All relative imports **must** include the `.js` extension — TypeScript resolves `.ts` files but Node/ESM requires `.js` at runtime:
+
+```ts
+// ✅ Correct
+import { HotelsService } from './hotels.service.js';
+import { PrismaService } from '../prisma/prisma.service.js';
+
+// ❌ Wrong — will fail at runtime
+import { HotelsService } from './hotels.service';
+```
+
+### DTOs and validation
+All request bodies are typed with DTOs using `class-validator` decorators:
+
+```ts
+export class CreateHotelDto {
+  @IsString()
+  @MinLength(2)
+  name: string;
+
+  @IsString()
+  @IsOptional()
+  phone?: string;
+}
+```
+
+### Auth guards
+
+```ts
+// Any authenticated user
+@UseGuards(JwtAuthGuard)
+
+// Specific role required
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.HOTEL_OWNER)
+```
+
+### Current user
+
+```ts
+@Get('profile')
+@UseGuards(JwtAuthGuard)
+getProfile(@CurrentUser() user: JwtUser) {
+  return this.usersService.findById(user.userId);
+}
+```
+
+### PrismaModule
+`PrismaModule` is globally registered — inject `PrismaService` directly in any service constructor without adding it to `imports`.
+
+### Config
+Always use `ConfigService`, never `process.env` directly:
+
+```ts
+constructor(private configService: ConfigService) {}
+
+// Later:
+const secret = this.configService.get<string>('JWT_SECRET');
+```
+
+## Frontend Integration
+
+The Next.js frontend at `hotel-os/` currently uses mock data files (e.g. `app/hotels/mock.ts`). As each backend module is completed, the frontend page is updated to call the real API:
+
+```ts
+// Before — mock data
+import { SEARCH_MOCK_HOTELS } from '../mock';
+const hotels = SEARCH_MOCK_HOTELS;
+
+// After — real API
+const response = await fetch('http://localhost:3001/api/v1/hotels?city=Lagos');
+const { hotels } = await response.json();
+```
+
+The frontend and backend are developed in parallel. Completing a backend module unlocks the frontend wiring task for that module.
+
+## Testing
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+npm run test          # unit tests (Vitest)
+npm run test:e2e      # end-to-end tests
+npm run test:cov      # coverage report
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## API Documentation
 
-## Observability
-
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
-
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
-
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
-
-This project is already instrumented. Create a free account at [observe.nestjs.com](https://observe.nestjs.com), add an application, and paste the generated app key and secret into the `ObserveModule.forRoot()` call in `src/app.module.ts`.
-
-The free plan needs no payment details and covers 300,000 events a month. You can also browse the [live demo](https://www.observe-demo.nestjs.com/dashboard) first - the whole dashboard over a busy service's data, with nothing to install.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observe](https://observe.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Swagger UI is available at `http://localhost:3001/api/docs` when the server is running. All endpoints are documented with request/response shapes.
