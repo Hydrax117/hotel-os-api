@@ -280,9 +280,17 @@ export class BookingsService {
     ownerId: string,
     query: BookingQueryDto,
   ): Promise<{ bookings: Booking[]; total: number }> {
-    const hotel = await this.prisma.hotel.findUnique({ where: { id: hotelId } });
+    const hotel = await this.prisma.hotel.findUnique({
+      where: { id: hotelId },
+      include: { staff: true },
+    });
     if (!hotel) throw new NotFoundException('Hotel not found');
-    if (hotel.ownerId !== ownerId) throw new ForbiddenException('You do not own this hotel');
+
+    const isOwner = hotel.ownerId === ownerId;
+    const isStaff = hotel.staff.some((s) => s.userId === ownerId && s.isActive);
+    if (!isOwner && !isStaff) {
+      throw new ForbiddenException('You do not have access to this hotel');
+    }
 
     const page = query.page ?? 1;
     const limit = query.limit ?? 10;
@@ -335,9 +343,7 @@ export class BookingsService {
       await this.prisma.booking.update({
         where: { id: booking.id },
         data: {
-          status: BookingStatus.CANCELLED,
-          cancelledAt: new Date(),
-          cancellationReason: 'Hold expired',
+          status: BookingStatus.PENDING,
         },
       });
     }

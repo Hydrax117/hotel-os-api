@@ -136,13 +136,22 @@ export class InventoryService {
   }
 
   async holdInventory(roomTypeId: string, checkIn: Date, checkOut: Date): Promise<void> {
+    const roomType = await this.prisma.roomType.findUnique({ where: { id: roomTypeId } });
+    if (!roomType) throw new NotFoundException(`RoomType ${roomTypeId} not found`);
+
     const dates = generateDateRange(checkIn, checkOut);
 
     await this.prisma.$transaction(async (tx) => {
       for (const date of dates) {
-        await tx.inventoryDay.update({
+        await tx.inventoryDay.upsert({
           where: { roomTypeId_date: { roomTypeId, date } },
-          data: { heldUnits: { increment: 1 } },
+          create: {
+            roomTypeId,
+            date,
+            totalUnits: roomType.totalRooms,
+            heldUnits: 1,
+          },
+          update: { heldUnits: { increment: 1 } },
         });
       }
     });
