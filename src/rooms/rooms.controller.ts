@@ -121,9 +121,10 @@ export class RoomsController {
   @ApiOperation({ summary: 'Update room status (owner only)' })
   updateRoomStatus(
     @Param('roomId') roomId: string,
+    @CurrentUser() user: JwtUser,
     @Body() dto: UpdateRoomStatusDto,
   ) {
-    return this.roomsService.updateRoomStatus(roomId, dto);
+    return this.roomsService.updateRoomStatus(roomId, user.userId, dto);
   }
 
   @Delete(':id/rooms/:roomId')

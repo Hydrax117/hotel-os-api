@@ -169,9 +169,19 @@ export class RoomsService {
     });
   }
 
-  async updateRoomStatus(roomId: string, dto: UpdateRoomStatusDto): Promise<Room> {
-    const room = await this.prisma.room.findUnique({ where: { id: roomId } });
+  async updateRoomStatus(
+    roomId: string,
+    ownerId: string,
+    dto: UpdateRoomStatusDto,
+  ): Promise<Room> {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: { roomType: { include: { hotel: true } } },
+    });
     if (!room) throw new NotFoundException(`Room ${roomId} not found`);
+    if (room.roomType.hotel.ownerId !== ownerId) {
+      throw new ForbiddenException('You do not own this hotel');
+    }
 
     return this.prisma.room.update({
       where: { id: roomId },

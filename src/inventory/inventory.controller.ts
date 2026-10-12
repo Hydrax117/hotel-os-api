@@ -18,8 +18,10 @@ import {
 import { UserRole } from '@prisma/client';
 import { InventoryService } from './inventory.service.js';
 import { GetAvailabilityDto } from './dto/get-availability.dto.js';
+import { GetCalendarDto } from './dto/get-calendar.dto.js';
 import { UpdateInventoryDto } from './dto/update-inventory.dto.js';
 import { BulkUpdateInventoryDto } from './dto/bulk-update-inventory.dto.js';
+import { EnsureInventoryDto } from './dto/ensure-inventory.dto.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../auth/guards/roles.guard.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
@@ -49,10 +51,9 @@ export class InventoryController {
   @ApiQuery({ name: 'to', required: true, example: '2025-09-30' })
   getCalendar(
     @Param('roomTypeId') roomTypeId: string,
-    @Query('from') from: string,
-    @Query('to') to: string,
+    @Query() dto: GetCalendarDto,
   ) {
-    return this.inventoryService.getCalendar(roomTypeId, from, to);
+    return this.inventoryService.getCalendar(roomTypeId, dto.from, dto.to);
   }
 
   // ─── Hotel Owner ───────────────────────────────────────────────────────────
@@ -91,8 +92,8 @@ export class InventoryController {
   @ApiResponse({ status: 201 })
   ensureInventoryExists(
     @Param('roomTypeId') roomTypeId: string,
-    @Body() body: { days: number },
+    @Body() dto: EnsureInventoryDto,
   ) {
-    return this.inventoryService.ensureInventoryExists(roomTypeId, body.days);
+    return this.inventoryService.ensureInventoryExists(roomTypeId, dto.days);
   }
 }

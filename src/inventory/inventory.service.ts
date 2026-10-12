@@ -137,14 +137,15 @@ export class InventoryService {
 
   async holdInventory(roomTypeId: string, checkIn: Date, checkOut: Date): Promise<void> {
     const dates = generateDateRange(checkIn, checkOut);
-    await this.prisma.$transaction(
-      dates.map((date) =>
-        this.prisma.inventoryDay.updateMany({
-          where: { roomTypeId, date },
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const date of dates) {
+        await tx.inventoryDay.update({
+          where: { roomTypeId_date: { roomTypeId, date } },
           data: { heldUnits: { increment: 1 } },
-        }),
-      ),
-    );
+        });
+      }
+    });
   }
 
   async releaseHold(roomTypeId: string, checkIn: Date, checkOut: Date): Promise<void> {
