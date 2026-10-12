@@ -44,7 +44,7 @@ hotel-os-api/
     inventory/      ✅ Complete — date-based availability, holds, calendar
     search/         ✅ Complete — hotel search, availability filtering, popular cities, featured hotels
     bookings/       ✅ Complete — reservation state machine, temporary holds
-    payments/       ⬜ Pending
+    payments/       ✅ Complete — Paystack integration, webhooks, refunds
     reviews/        ⬜ Pending
     subscriptions/  ⬜ Pending
     notifications/  ⬜ Pending
@@ -151,6 +151,24 @@ Base URL: `http://localhost:3001/api/v1`
 
 **Search query params**: `city`, `state`, `q` (name), `checkIn`, `checkOut`, `guests`, `minPrice`, `maxPrice`, `minRating`, `amenities[]`, `sortBy` (recommended|price_asc|price_desc|rating), `page`, `limit`.
 
+### Payments
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/payments/webhook` | None | Paystack webhook receiver (raw body) |
+| POST | `/payments/initialize` | Bearer | Initialize a Paystack payment for a booking |
+| GET | `/payments/verify/:reference` | Bearer | Verify a payment reference with Paystack |
+| GET | `/payments/booking/:bookingId` | Bearer | Get payment record for a booking |
+| GET | `/payments/hotel/:hotelId` | HOTEL_OWNER | List all payments for a hotel's bookings |
+| POST | `/payments/:paymentId/refund` | Bearer | Issue a refund for a successful payment |
+
+**Payment flow:**
+1. Guest creates a booking (`POST /bookings`) — booking enters `HELD` status with 10-min hold.
+2. Guest initializes payment (`POST /payments/initialize`) — returns a Paystack authorization URL. Booking moves to `PAYMENT_PENDING`.
+3. Guest completes payment on Paystack-hosted page.
+4. Paystack sends `charge.success` webhook (`POST /payments/webhook`) — payment confirmed, booking moves to `CONFIRMED`.
+5. Guest can also verify manually (`GET /payments/verify/:reference`) — idempotent, safe to call multiple times.
+
 ### Bookings
 
 | Method | Path | Auth | Description |
@@ -207,10 +225,8 @@ Copy `.env.example` to `.env` and fill in the values:
 | `PORT` | Port the API server listens on | `3001` |
 | `NODE_ENV` | Environment flag | `development` |
 | `FRONTEND_URL` | Frontend origin for CORS | `http://localhost:3000` |
-| `PAYSTACK_SECRET_KEY` | Paystack secret key (payments — not yet active) | `sk_test_xxx` |
-| `PAYSTACK_PUBLIC_KEY` | Paystack public key | `pk_test_xxx` |
-| `PLATFORM_COMMISSION_PERCENT` | Platform commission on each payment | `10` |
-| `SERVICE_FEE_PERCENT` | Service fee charged to the traveler | `3` |
+| `PAYSTACK_SECRET_KEY` | Paystack secret key | `sk_test_xxx` |
+| `PLATFORM_COMMISSION_RATE` | Platform commission rate (decimal) | `0.1` |
 
 ## Development Workflow
 
@@ -239,8 +255,8 @@ Modules must be built in dependency order. A module that depends on another (e.g
 ✅ Inventory module   — date-based availability, holds, calendar
 ✅ Search module      — availability search (traveler-facing)
 ✅ Bookings module    — reservation state machine, temporary holds
-🔄 Payments module    — Paystack integration, webhooks (Next)
-⬜ Reviews module     — verified post-stay reviews
+✅ Payments module    — Paystack integration, webhooks, refunds
+🔄 Reviews module     — verified post-stay reviews (Next)
 ⬜ Subscriptions      — billing, grace period, suspension
 ⬜ Notifications      — email and WhatsApp delivery via BullMQ
 ⬜ Admin module       — platform management endpoints

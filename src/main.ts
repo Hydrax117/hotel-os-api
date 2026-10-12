@@ -1,11 +1,12 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { AppModule, ObserveInstrument } from './app.module.js';
+import { AppModule, ObserveInstrument } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     instrument: ObserveInstrument,
+    rawBody: true,
   });
 
   app.setGlobalPrefix('api/v1');
@@ -28,4 +29,4 @@ async function bootstrap() {
 
   await app.listen(process.env['PORT'] ?? 3001);
 }
-await bootstrap();
+bootstrap();
