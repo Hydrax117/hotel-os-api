@@ -42,7 +42,7 @@ hotel-os-api/
     hotels/         ✅ Complete — CRUD, verification, admin approval
     rooms/          ✅ Complete — room types, physical rooms
     inventory/      ✅ Complete — date-based availability, holds, calendar
-    search/         ⬜ Pending
+    search/         ✅ Complete — hotel search, availability filtering, popular cities, featured hotels
     bookings/       ⬜ Pending
     payments/       ⬜ Pending
     reviews/        ⬜ Pending
@@ -140,6 +140,17 @@ Base URL: `http://localhost:3001/api/v1`
 | PATCH | `/room-types/:roomTypeId/inventory/bulk` | HOTEL_OWNER | Bulk update inventory over a date range |
 | POST | `/room-types/:roomTypeId/inventory/ensure` | HOTEL_OWNER | Pre-populate inventory days |
 
+### Search
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/search/hotels` | None | Search approved hotels — optional date availability filtering |
+| GET | `/search/hotels/:idOrSlug` | None | Get full hotel detail by id or slug, optional availability check |
+| GET | `/search/popular-cities` | None | Get top 10 cities ranked by hotel count |
+| GET | `/search/featured` | None | Get featured hotels (highest review count) |
+
+**Search query params**: `city`, `state`, `q` (name), `checkIn`, `checkOut`, `guests`, `minPrice`, `maxPrice`, `minRating`, `amenities[]`, `sortBy` (recommended|price_asc|price_desc|rating), `page`, `limit`.
+
 ## Getting Started
 
 ### Prerequisites
@@ -214,7 +225,7 @@ Modules must be built in dependency order. A module that depends on another (e.g
 ✅ Hotels module      — hotel CRUD, verification, admin approval
 ✅ Rooms module       — room types, physical rooms
 ✅ Inventory module   — date-based availability, holds, calendar
-⬜ Search module      — availability search (traveler-facing)
+✅ Search module      — availability search (traveler-facing)
 ⬜ Bookings module    — reservation state machine, temporary holds
 ⬜ Payments module    — Paystack integration, webhooks
 ⬜ Reviews module     — verified post-stay reviews
