@@ -288,39 +288,45 @@ export class AdminService {
   }
 
   async getRevenueStats(fromDate: string, toDate: string): Promise<RevenueStats> {
-    const payments = await this.prisma.payment.findMany({
-      where: {
-        status: PaymentStatus.SUCCESS,
-        paidAt: { gte: new Date(fromDate), lte: new Date(toDate + 'T23:59:59Z') },
-      },
-    });
+    // Compute totals via database aggregate — avoids loading all rows into memory
+    const [totalsAgg, dailyRows] = await Promise.all([
+      this.prisma.payment.aggregate({
+        where: {
+          status: PaymentStatus.SUCCESS,
+          paidAt: { gte: new Date(fromDate), lte: new Date(toDate + 'T23:59:59Z') },
+        },
+        _sum: { amountNgn: true, commissionNgn: true },
+        _count: true,
+      }),
+      // Group by date in the database using raw SQL
+      this.prisma.$queryRaw<
+        { date: string; gmv_ngn: number; commission_ngn: number; bookings: bigint }[]
+      >`
+        SELECT
+          TO_CHAR("paidAt" AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date,
+          SUM("amountNgn")::float8     AS gmv_ngn,
+          SUM("commissionNgn")::float8 AS commission_ngn,
+          COUNT(*)                     AS bookings
+        FROM "Payment"
+        WHERE status = 'SUCCESS'
+          AND "paidAt" >= ${new Date(fromDate)}
+          AND "paidAt" <= ${new Date(toDate + 'T23:59:59Z')}
+        GROUP BY 1
+        ORDER BY 1
+      `,
+    ]);
 
-    const dailyMap = new Map<
-      string,
-      { gmvNgn: number; commissionNgn: number; bookings: number }
-    >();
-
-    for (const p of payments) {
-      const date = p.paidAt ? p.paidAt.toISOString().slice(0, 10) : 'unknown';
-      const existing = dailyMap.get(date) ?? { gmvNgn: 0, commissionNgn: 0, bookings: 0 };
-      dailyMap.set(date, {
-        gmvNgn: existing.gmvNgn + Number(p.amountNgn),
-        commissionNgn: existing.commissionNgn + Number(p.commissionNgn ?? 0),
-        bookings: existing.bookings + 1,
-      });
-    }
-
-    const dailyRevenue = Array.from(dailyMap.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, v]) => ({ date, ...v }));
-
-    const totalGmvNgn = payments.reduce((sum, p) => sum + Number(p.amountNgn), 0);
-    const totalCommissionNgn = payments.reduce(
-      (sum, p) => sum + Number(p.commissionNgn ?? 0),
-      0,
-    );
-    const bookingCount = payments.length;
+    const totalGmvNgn = Number(totalsAgg._sum.amountNgn ?? 0);
+    const totalCommissionNgn = Number(totalsAgg._sum.commissionNgn ?? 0);
+    const bookingCount = totalsAgg._count;
     const averageBookingValueNgn = bookingCount > 0 ? totalGmvNgn / bookingCount : 0;
+
+    const dailyRevenue = dailyRows.map((row) => ({
+      date: row.date,
+      gmvNgn: Number(row.gmv_ngn),
+      commissionNgn: Number(row.commission_ngn),
+      bookings: Number(row.bookings),
+    }));
 
     return {
       fromDate,

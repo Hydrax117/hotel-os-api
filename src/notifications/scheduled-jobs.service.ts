@@ -48,7 +48,7 @@ export class ScheduledJobsService {
     }
   }
 
-  @Cron('0 8 * * *')
+  @Cron('0 8 * * *', { timeZone: 'UTC' })
   async sendCheckInReminders(): Promise<void> {
     try {
       const tomorrow = new Date();

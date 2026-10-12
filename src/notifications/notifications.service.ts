@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { MailerService } from '@nestjs-modules/mailer';
 import { NOTIFICATION_QUEUE, NotificationJobType } from './notification-queues.js';
 

@@ -1,80 +1,56 @@
-import { Processor, Process } from '@nestjs/bull';
+import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
-import { Job } from 'bull';
+import { Job } from 'bullmq';
 import { NotificationsService } from './notifications.service.js';
 import { NOTIFICATION_QUEUE, NotificationJobType } from './notification-queues.js';
 
 @Processor(NOTIFICATION_QUEUE)
-export class NotificationsConsumer {
+export class NotificationsConsumer extends WorkerHost {
   private readonly logger = new Logger(NotificationsConsumer.name);
 
-  constructor(private readonly notificationsService: NotificationsService) {}
-
-  @Process({ name: NotificationJobType.BOOKING_CONFIRMATION })
-  async handleBookingConfirmation(
-    job: Job<Parameters<NotificationsService['sendBookingConfirmation']>[0]>,
-  ): Promise<void> {
-    try {
-      await this.notificationsService.sendBookingConfirmation(job.data);
-    } catch (err) {
-      this.logger.error(
-        `Failed to process ${NotificationJobType.BOOKING_CONFIRMATION} (id: ${job.id})`,
-        err instanceof Error ? err.stack : String(err),
-      );
-    }
+  constructor(private readonly notificationsService: NotificationsService) {
+    super();
   }
 
-  @Process({ name: NotificationJobType.BOOKING_CANCELLED })
-  async handleBookingCancelled(
-    job: Job<Parameters<NotificationsService['sendBookingCancelled']>[0]>,
-  ): Promise<void> {
+  async process(job: Job<Record<string, unknown>>): Promise<void> {
     try {
-      await this.notificationsService.sendBookingCancelled(job.data);
-    } catch (err) {
-      this.logger.error(
-        `Failed to process ${NotificationJobType.BOOKING_CANCELLED} (id: ${job.id})`,
-        err instanceof Error ? err.stack : String(err),
-      );
-    }
-  }
+      switch (job.name as NotificationJobType) {
+        case NotificationJobType.BOOKING_CONFIRMATION:
+          await this.notificationsService.sendBookingConfirmation(
+            job.data as Parameters<NotificationsService['sendBookingConfirmation']>[0],
+          );
+          break;
 
-  @Process({ name: NotificationJobType.CHECK_IN_REMINDER })
-  async handleCheckInReminder(
-    job: Job<Parameters<NotificationsService['sendCheckInReminder']>[0]>,
-  ): Promise<void> {
-    try {
-      await this.notificationsService.sendCheckInReminder(job.data);
-    } catch (err) {
-      this.logger.error(
-        `Failed to process ${NotificationJobType.CHECK_IN_REMINDER} (id: ${job.id})`,
-        err instanceof Error ? err.stack : String(err),
-      );
-    }
-  }
+        case NotificationJobType.BOOKING_CANCELLED:
+          await this.notificationsService.sendBookingCancelled(
+            job.data as Parameters<NotificationsService['sendBookingCancelled']>[0],
+          );
+          break;
 
-  @Process({ name: NotificationJobType.WELCOME_EMAIL })
-  async handleWelcomeEmail(
-    job: Job<Parameters<NotificationsService['sendWelcomeEmail']>[0]>,
-  ): Promise<void> {
-    try {
-      await this.notificationsService.sendWelcomeEmail(job.data);
-    } catch (err) {
-      this.logger.error(
-        `Failed to process ${NotificationJobType.WELCOME_EMAIL} (id: ${job.id})`,
-        err instanceof Error ? err.stack : String(err),
-      );
-    }
-  }
+        case NotificationJobType.CHECK_IN_REMINDER:
+          await this.notificationsService.sendCheckInReminder(
+            job.data as Parameters<NotificationsService['sendCheckInReminder']>[0],
+          );
+          break;
 
-  @Process({ name: NotificationJobType.HOTEL_APPROVED })
-  async handleHotelApproved(
-    job: Job<Parameters<NotificationsService['sendHotelApprovedEmail']>[0]>,
-  ): Promise<void> {
-    try {
-      await this.notificationsService.sendHotelApprovedEmail(job.data);
+        case NotificationJobType.WELCOME_EMAIL:
+          await this.notificationsService.sendWelcomeEmail(
+            job.data as Parameters<NotificationsService['sendWelcomeEmail']>[0],
+          );
+          break;
+
+        case NotificationJobType.HOTEL_APPROVED:
+          await this.notificationsService.sendHotelApprovedEmail(
+            job.data as Parameters<NotificationsService['sendHotelApprovedEmail']>[0],
+          );
+          break;
+
+        default:
+          this.logger.warn(`Unknown notification job type: ${job.name}`);
+      }
     } catch (err) {
       this.logger.error(
-        `Failed to process ${NotificationJobType.HOTEL_APPROVED} (id: ${job.id})`,
+        `Failed to process notification job ${job.name} (id: ${job.id})`,
         err instanceof Error ? err.stack : String(err),
       );
     }

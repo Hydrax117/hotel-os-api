@@ -9,6 +9,7 @@ import { AdminHotelQueryDto } from './dto/admin-hotel-query.dto.js';
 import { AdminUserQueryDto } from './dto/admin-user-query.dto.js';
 import { AdminBookingQueryDto } from './dto/admin-booking-query.dto.js';
 import { AdminApproveHotelDto } from './dto/approve-hotel.dto.js';
+import { SuspendHotelDto } from './dto/suspend-hotel.dto.js';
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 import { type JwtUser } from '../auth/strategies/jwt.strategy.js';
 
@@ -55,9 +56,9 @@ export class AdminController {
   suspendHotel(
     @Param('id') id: string,
     @CurrentUser() user: JwtUser,
-    @Body() body: { reason: string },
+    @Body() dto: SuspendHotelDto,
   ) {
-    return this.adminService.suspendHotel(id, user.userId, body.reason);
+    return this.adminService.suspendHotel(id, user.userId, dto.reason);
   }
 
   @Get('users')
