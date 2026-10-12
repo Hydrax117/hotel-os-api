@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
   ForbiddenException,
@@ -14,6 +15,8 @@ import { type BookingQueryDto } from './dto/booking-query.dto.js';
 
 @Injectable()
 export class BookingsService {
+  private readonly logger = new Logger(BookingsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventoryService: InventoryService,
@@ -335,17 +338,24 @@ export class BookingsService {
     });
 
     for (const booking of expiredBookings) {
-      await this.inventoryService.releaseHold(
-        booking.roomTypeId,
-        new Date(booking.checkIn),
-        new Date(booking.checkOut),
-      );
-      await this.prisma.booking.update({
-        where: { id: booking.id },
-        data: {
-          status: BookingStatus.PENDING,
-        },
-      });
+      try {
+        await this.inventoryService.releaseHold(
+          booking.roomTypeId,
+          new Date(booking.checkIn),
+          new Date(booking.checkOut),
+        );
+        await this.prisma.booking.update({
+          where: { id: booking.id },
+          data: {
+            status: BookingStatus.PENDING,
+          },
+        });
+      } catch (err) {
+        this.logger.error(
+          `Failed to release expired hold for booking ${booking.id}`,
+          err instanceof Error ? err.stack : String(err),
+        );
+      }
     }
 
     return expiredBookings.length;
