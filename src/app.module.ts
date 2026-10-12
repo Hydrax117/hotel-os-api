@@ -10,6 +10,8 @@ import { InventoryModule } from './inventory/inventory.module.js';
 import { SearchModule } from './search/search.module.js';
 import { BookingsModule } from './bookings/bookings.module.js';
 import { PaymentsModule } from './payments/payments.module.js';
+import { ReviewsModule } from './reviews/reviews.module.js';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -30,6 +32,8 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     SearchModule,
     BookingsModule,
     PaymentsModule,
+    ReviewsModule,
+    SubscriptionsModule,
   ],
 })
 export class AppModule {}

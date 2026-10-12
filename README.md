@@ -45,8 +45,8 @@ hotel-os-api/
     search/         ✅ Complete — hotel search, availability filtering, popular cities, featured hotels
     bookings/       ✅ Complete — reservation state machine, temporary holds
     payments/       ✅ Complete — Paystack integration, webhooks, refunds
-    reviews/        ⬜ Pending
-    subscriptions/  ⬜ Pending
+    reviews/        ✅ Complete — verified post-stay reviews, hotel responses, admin moderation
+    subscriptions/  ✅ Complete — plan management, billing cycles, grace period, admin suspend/reactivate
     notifications/  ⬜ Pending
     admin/          ⬜ Pending
     common/
@@ -150,6 +150,43 @@ Base URL: `http://localhost:3001/api/v1`
 | GET | `/search/featured` | None | Get featured hotels (highest review count) |
 
 **Search query params**: `city`, `state`, `q` (name), `checkIn`, `checkOut`, `guests`, `minPrice`, `maxPrice`, `minRating`, `amenities[]`, `sortBy` (recommended|price_asc|price_desc|rating), `page`, `limit`.
+
+### Reviews
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/reviews` | Bearer | Create a review (only for CHECKED_OUT bookings) |
+| GET | `/reviews/my` | Bearer | List all reviews written by the authenticated user |
+| GET | `/reviews/:id` | None | Get a review by ID |
+| POST | `/reviews/:id/respond` | Bearer (hotel owner) | Add a hotel response to a review |
+| PATCH | `/reviews/:id/approve` | SUPER_ADMIN | Approve a review |
+| PATCH | `/reviews/:id/flag` | SUPER_ADMIN | Flag a review for moderation |
+| DELETE | `/reviews/:id` | SUPER_ADMIN | Delete a review |
+| GET | `/hotels/:hotelId/reviews` | None | List reviews for a hotel (paginated, filterable by rating/approval) |
+
+### Subscriptions
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/subscriptions/plans` | None | List all available subscription plans and pricing |
+| POST | `/subscriptions/hotels/:hotelId` | HOTEL_OWNER | Subscribe a hotel to a plan |
+| GET | `/subscriptions/hotels/:hotelId` | HOTEL_OWNER | Get the current subscription for a hotel |
+| PATCH | `/subscriptions/hotels/:hotelId/plan` | HOTEL_OWNER | Change the subscription plan |
+| DELETE | `/subscriptions/hotels/:hotelId` | HOTEL_OWNER | Cancel (archive) the subscription |
+| POST | `/subscriptions/hotels/:hotelId/suspend` | SUPER_ADMIN | Suspend a hotel's subscription (unpublishes hotel) |
+| POST | `/subscriptions/hotels/:hotelId/reactivate` | SUPER_ADMIN | Reactivate a suspended subscription (republishes hotel) |
+
+**Subscription plans (NGN/month):**
+- `STARTER` — ₦25,000/month: Hotel listing, basic dashboard, bookings, inventory
+- `PROFESSIONAL` — ₦50,000/month: Everything in Starter + analytics, staff accounts, advanced inventory, promotions
+- `ENTERPRISE` — ₦150,000/month: Everything in Professional + API integration, multi-property support, advanced reporting, dedicated support
+
+**Subscription lifecycle:**
+1. Hotel owner subscribes → status `ACTIVE`, `nextBilling` set 1 month out.
+2. If billing lapses → status moves to `GRACE_PERIOD` (7-day window via `checkExpiredSubscriptions` cron).
+3. After grace period ends → status `SUSPENDED`, hotel unpublished.
+4. Admin can `reactivate` → status back to `ACTIVE`, hotel republished.
+5. Owner can cancel at any time → status `ARCHIVED`.
 
 ### Payments
 
@@ -256,9 +293,9 @@ Modules must be built in dependency order. A module that depends on another (e.g
 ✅ Search module      — availability search (traveler-facing)
 ✅ Bookings module    — reservation state machine, temporary holds
 ✅ Payments module    — Paystack integration, webhooks, refunds
-🔄 Reviews module     — verified post-stay reviews (Next)
-⬜ Subscriptions      — billing, grace period, suspension
-⬜ Notifications      — email and WhatsApp delivery via BullMQ
+✅ Reviews module     — verified post-stay reviews, hotel responses, admin moderation
+✅ Subscriptions      — plan management, billing cycles, grace period, admin suspend/reactivate
+🔄 Notifications      — email and WhatsApp delivery via BullMQ (Next)
 ⬜ Admin module       — platform management endpoints
 ```
 
