@@ -230,6 +230,14 @@ export class BookingsService {
       throw new BadRequestException('Invalid status transition');
     }
 
+    if (dto.status === BookingStatus.CANCELLED && booking.status === BookingStatus.CONFIRMED) {
+      await this.inventoryService.releaseBooking(
+        booking.roomTypeId,
+        new Date(booking.checkIn),
+        new Date(booking.checkOut),
+      );
+    }
+
     const updateData: Prisma.BookingUpdateInput = { status: dto.status };
     if (dto.status === BookingStatus.CANCELLED) {
       updateData.cancelledAt = new Date();
@@ -326,7 +334,11 @@ export class BookingsService {
       );
       await this.prisma.booking.update({
         where: { id: booking.id },
-        data: { status: BookingStatus.PENDING },
+        data: {
+          status: BookingStatus.CANCELLED,
+          cancelledAt: new Date(),
+          cancellationReason: 'Hold expired',
+        },
       });
     }
 
