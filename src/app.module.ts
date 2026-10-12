@@ -8,6 +8,7 @@ import { HotelsModule } from './hotels/hotels.module.js';
 import { RoomsModule } from './rooms/rooms.module.js';
 import { InventoryModule } from './inventory/inventory.module.js';
 import { SearchModule } from './search/search.module.js';
+import { BookingsModule } from './bookings/bookings.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -26,6 +27,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     RoomsModule,
     InventoryModule,
     SearchModule,
+    BookingsModule,
   ],
 })
 export class AppModule {}

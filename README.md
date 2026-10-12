@@ -43,7 +43,7 @@ hotel-os-api/
     rooms/          ✅ Complete — room types, physical rooms
     inventory/      ✅ Complete — date-based availability, holds, calendar
     search/         ✅ Complete — hotel search, availability filtering, popular cities, featured hotels
-    bookings/       ⬜ Pending
+    bookings/       ✅ Complete — reservation state machine, temporary holds
     payments/       ⬜ Pending
     reviews/        ⬜ Pending
     subscriptions/  ⬜ Pending
@@ -151,6 +151,18 @@ Base URL: `http://localhost:3001/api/v1`
 
 **Search query params**: `city`, `state`, `q` (name), `checkIn`, `checkOut`, `guests`, `minPrice`, `maxPrice`, `minRating`, `amenities[]`, `sortBy` (recommended|price_asc|price_desc|rating), `page`, `limit`.
 
+### Bookings
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/bookings` | Bearer | Create a booking (HELD status, 10-min hold) |
+| GET | `/bookings` | Bearer | List the authenticated user's bookings (paginated) |
+| GET | `/bookings/hotel/:hotelId` | HOTEL_OWNER | List all bookings for a hotel |
+| GET | `/bookings/:id` | Bearer | Get a booking by ID |
+| POST | `/bookings/:id/cancel` | Bearer | Cancel a booking |
+| POST | `/bookings/:id/confirm` | Bearer | Confirm a booking (test endpoint — will be replaced by payment webhook) |
+| PATCH | `/bookings/:id/status` | HOTEL_OWNER/STAFF | Update booking status (check-in, check-out, no-show) |
+
 ## Getting Started
 
 ### Prerequisites
@@ -226,8 +238,8 @@ Modules must be built in dependency order. A module that depends on another (e.g
 ✅ Rooms module       — room types, physical rooms
 ✅ Inventory module   — date-based availability, holds, calendar
 ✅ Search module      — availability search (traveler-facing)
-⬜ Bookings module    — reservation state machine, temporary holds
-⬜ Payments module    — Paystack integration, webhooks
+✅ Bookings module    — reservation state machine, temporary holds
+🔄 Payments module    — Paystack integration, webhooks (Next)
 ⬜ Reviews module     — verified post-stay reviews
 ⬜ Subscriptions      — billing, grace period, suspension
 ⬜ Notifications      — email and WhatsApp delivery via BullMQ
