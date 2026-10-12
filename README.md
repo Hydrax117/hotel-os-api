@@ -39,9 +39,9 @@ hotel-os-api/
     auth/           ✅ Complete — register, login, refresh, logout, me
     users/          ✅ Complete — profile get/update
     prisma/         ✅ Complete — global PrismaService
-    hotels/         🔄 In progress — CRUD, verification, admin approval
-    rooms/          ⬜ Pending
-    inventory/      ⬜ Pending
+    hotels/         ✅ Complete — CRUD, verification, admin approval
+    rooms/          ✅ Complete — room types, physical rooms
+    inventory/      ✅ Complete — date-based availability, holds, calendar
     search/         ⬜ Pending
     bookings/       ⬜ Pending
     payments/       ⬜ Pending
@@ -103,7 +103,7 @@ Base URL: `http://localhost:3001/api/v1`
 | GET | `/users/profile` | Bearer | Get the authenticated user's profile |
 | PATCH | `/users/profile` | Bearer | Update the authenticated user's profile |
 
-### Hotels (in progress)
+### Hotels
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
@@ -115,6 +115,30 @@ Base URL: `http://localhost:3001/api/v1`
 | POST | `/hotels` | HOTEL_OWNER | Create a new hotel (one per owner) |
 | PATCH | `/hotels/:id` | HOTEL_OWNER | Update hotel details |
 | PATCH | `/hotels/:id/verify` | SUPER_ADMIN | Approve, reject, or suspend a hotel |
+
+### Rooms
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/hotels/:hotelId/room-types` | None | List all room types for a hotel |
+| POST | `/hotels/:hotelId/room-types` | HOTEL_OWNER | Create a room type |
+| GET | `/hotels/:hotelId/room-types/:id` | None | Get a room type by ID |
+| PATCH | `/hotels/:hotelId/room-types/:id` | HOTEL_OWNER | Update a room type |
+| DELETE | `/hotels/:hotelId/room-types/:id` | HOTEL_OWNER | Delete a room type (no active bookings) |
+| GET | `/hotels/:hotelId/room-types/:id/rooms` | HOTEL_OWNER | List physical rooms in a room type |
+| POST | `/hotels/:hotelId/room-types/:id/rooms` | HOTEL_OWNER | Add a physical room |
+| PATCH | `/hotels/:hotelId/room-types/:id/rooms/:roomId/status` | HOTEL_OWNER | Update room status |
+| DELETE | `/hotels/:hotelId/room-types/:id/rooms/:roomId` | HOTEL_OWNER | Delete a physical room |
+
+### Inventory
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/room-types/:roomTypeId/inventory/availability` | None | Check availability for a date range |
+| GET | `/room-types/:roomTypeId/inventory/calendar` | None | Get inventory calendar |
+| PATCH | `/room-types/:roomTypeId/inventory/day` | HOTEL_OWNER | Update a single inventory day |
+| PATCH | `/room-types/:roomTypeId/inventory/bulk` | HOTEL_OWNER | Bulk update inventory over a date range |
+| POST | `/room-types/:roomTypeId/inventory/ensure` | HOTEL_OWNER | Pre-populate inventory days |
 
 ## Getting Started
 
@@ -187,9 +211,9 @@ Modules must be built in dependency order. A module that depends on another (e.g
 ```
 ✅ Auth module        — JWT auth, roles, refresh tokens
 ✅ Users module       — profile management  
-🔄 Hotels module      — hotel CRUD, verification, admin approval
-⬜ Rooms module       — room types, physical rooms
-⬜ Inventory module   — date-based availability, holds
+✅ Hotels module      — hotel CRUD, verification, admin approval
+✅ Rooms module       — room types, physical rooms
+✅ Inventory module   — date-based availability, holds, calendar
 ⬜ Search module      — availability search (traveler-facing)
 ⬜ Bookings module    — reservation state machine, temporary holds
 ⬜ Payments module    — Paystack integration, webhooks
