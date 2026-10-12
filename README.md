@@ -47,8 +47,8 @@ hotel-os-api/
     payments/       ✅ Complete — Paystack integration, webhooks, refunds
     reviews/        ✅ Complete — verified post-stay reviews, hotel responses, admin moderation
     subscriptions/  ✅ Complete — plan management, billing cycles, grace period, admin suspend/reactivate
-    notifications/  ⬜ Pending
-    admin/          ⬜ Pending
+    notifications/  ✅ Complete — BullMQ email queue, Handlebars templates, scheduled cron jobs
+    admin/          ✅ Complete — platform stats, hotel/user/booking management, revenue analytics
     common/
       utils/        Shared utilities (slug generation, etc.)
   prisma/
@@ -188,6 +188,42 @@ Base URL: `http://localhost:3001/api/v1`
 4. Admin can `reactivate` → status back to `ACTIVE`, hotel republished.
 5. Owner can cancel at any time → status `ARCHIVED`.
 
+### Notifications
+
+Notifications are processed asynchronously via BullMQ — there are no HTTP endpoints. Other modules trigger email delivery by calling `NotificationsService` methods, which enqueue jobs to the `notifications` queue. The queue consumer (`NotificationsConsumer`) dequeues and sends emails via SMTP (configured via `SMTP_*` env vars).
+
+Scheduled cron jobs run automatically:
+
+| Schedule | Job | Description |
+|---|---|---|
+| Every 5 minutes | `releaseExpiredHolds` | Releases booking holds past their 10-min window |
+| Every hour | `checkSubscriptions` | Moves overdue subscriptions into grace period or suspended |
+| Daily at 08:00 UTC | `sendCheckInReminders` | Emails guests with check-ins scheduled for tomorrow |
+
+Email templates (Handlebars):
+- `booking-confirmation` — sent after payment confirms a booking
+- `booking-cancelled` — sent when a booking is cancelled
+- `check-in-reminder` — sent the day before check-in
+- `welcome` — sent when a new user registers
+- `hotel-approved` — sent when an admin approves a hotel
+
+### Admin
+
+All admin endpoints require `SUPER_ADMIN` role.
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/admin/stats` | Platform-wide statistics (hotels, bookings, revenue, users) |
+| GET | `/admin/revenue` | Revenue analytics by date range (`fromDate`, `toDate` query params) |
+| GET | `/admin/hotels` | List all hotels with optional `status`, `city`, `q` filters |
+| GET | `/admin/hotels/:id` | Full hotel detail with all relations |
+| POST | `/admin/hotels/:id/approve` | Approve or reject a hotel (body: `{ status, notes? }`) |
+| POST | `/admin/hotels/:id/suspend` | Suspend a hotel (body: `{ reason }`) |
+| GET | `/admin/users` | List all users with optional `role`, `q` filters |
+| POST | `/admin/users/:id/suspend` | Deactivate a user account |
+| POST | `/admin/users/:id/reactivate` | Reactivate a suspended user account |
+| GET | `/admin/bookings` | List all bookings with optional `status`, `fromDate`, `toDate` filters |
+
 ### Payments
 
 | Method | Path | Auth | Description |
@@ -264,6 +300,13 @@ Copy `.env.example` to `.env` and fill in the values:
 | `FRONTEND_URL` | Frontend origin for CORS | `http://localhost:3000` |
 | `PAYSTACK_SECRET_KEY` | Paystack secret key | `sk_test_xxx` |
 | `PLATFORM_COMMISSION_RATE` | Platform commission rate (decimal) | `0.1` |
+| `SMTP_HOST` | SMTP server hostname | `smtp.mailtrap.io` |
+| `SMTP_PORT` | SMTP server port | `587` |
+| `SMTP_USER` | SMTP authentication username | `your_mailtrap_user` |
+| `SMTP_PASS` | SMTP authentication password | `your_mailtrap_pass` |
+| `SMTP_FROM` | Default sender address | `"Hotel OS <noreply@hotel-os.com>"` |
+| `REDIS_HOST` | Redis server hostname (BullMQ) | `localhost` |
+| `REDIS_PORT` | Redis server port (BullMQ) | `6379` |
 
 ## Development Workflow
 
@@ -295,9 +338,28 @@ Modules must be built in dependency order. A module that depends on another (e.g
 ✅ Payments module    — Paystack integration, webhooks, refunds
 ✅ Reviews module     — verified post-stay reviews, hotel responses, admin moderation
 ✅ Subscriptions      — plan management, billing cycles, grace period, admin suspend/reactivate
-🔄 Notifications      — email and WhatsApp delivery via BullMQ (Next)
-⬜ Admin module       — platform management endpoints
+✅ Notifications      — BullMQ email queue, Handlebars templates, scheduled cron jobs
+✅ Admin module       — platform stats, hotel/user/booking management, revenue analytics
 ```
+
+## Project Status
+
+All backend modules are complete:
+
+| Module | Status | Description |
+|---|---|---|
+| Auth | ✅ Complete | JWT auth, roles, refresh tokens |
+| Users | ✅ Complete | Profile management |
+| Hotels | ✅ Complete | Hotel CRUD, verification, admin approval |
+| Rooms | ✅ Complete | Room types, physical rooms |
+| Inventory | ✅ Complete | Date-based availability, holds, calendar |
+| Search | ✅ Complete | Availability search (traveler-facing) |
+| Bookings | ✅ Complete | Reservation state machine, temporary holds |
+| Payments | ✅ Complete | Paystack integration, webhooks, refunds |
+| Reviews | ✅ Complete | Verified post-stay reviews, hotel responses |
+| Subscriptions | ✅ Complete | Plan management, billing cycles, grace period |
+| Notifications | ✅ Complete | BullMQ email queue, Handlebars templates, cron jobs |
+| Admin | ✅ Complete | Platform stats, hotel/user/booking management |
 
 ## Key Patterns
 

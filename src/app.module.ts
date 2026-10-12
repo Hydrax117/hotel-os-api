@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { createObserveModule } from '@nestjs/observe';
+import { BullModule } from '@nestjs/bull';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { UsersModule } from './users/users.module.js';
@@ -12,6 +13,8 @@ import { BookingsModule } from './bookings/bookings.module.js';
 import { PaymentsModule } from './payments/payments.module.js';
 import { ReviewsModule } from './reviews/reviews.module.js';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module.js';
+import { NotificationsModule } from './notifications/notifications.module.js';
+import { AdminModule } from './admin/admin.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -22,6 +25,15 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
       appKey: 'YOUR_APP_KEY',
       appSecret: 'YOUR_APP_SECRET',
       serviceId: 'hotel-os-api',
+    }),
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        redis: {
+          host: config.get('REDIS_HOST') ?? 'localhost',
+          port: config.get<number>('REDIS_PORT') ?? 6379,
+        },
+      }),
     }),
     PrismaModule,
     AuthModule,
@@ -34,6 +46,8 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     PaymentsModule,
     ReviewsModule,
     SubscriptionsModule,
+    NotificationsModule,
+    AdminModule,
   ],
 })
 export class AppModule {}
