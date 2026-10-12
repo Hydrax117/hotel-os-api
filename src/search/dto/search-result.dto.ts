@@ -20,7 +20,8 @@ export type HotelSearchResult = {
   reviewCount: number;
   primaryImageUrl: string | null;
   amenities: string[];
-  lowestPrice: number;
+  /** null when the hotel has no active room types. */
+  lowestPrice: number | null;
   availableRooms: RoomAvailability[];
   checkIn: string | null;
   checkOut: string | null;

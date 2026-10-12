@@ -51,10 +51,11 @@ export class SearchService {
       reviewCount: hotel._count.reviews,
       primaryImageUrl: hotel.images[0]?.url ?? null,
       amenities: hotel.amenities.map((a) => a.amenity.name),
+      // null when no active room types exist (distinguishable from "free" by consumers)
       lowestPrice:
         hotel.roomTypes.length > 0
           ? Math.min(...hotel.roomTypes.map((r) => Number(r.pricePerNight)))
-          : 0,
+          : null,
       availableRooms,
       checkIn,
       checkOut,
@@ -69,9 +70,19 @@ export class SearchService {
     const sorted = [...hotels];
     switch (sortBy) {
       case SortBy.PRICE_ASC:
-        return sorted.sort((a, b) => a.lowestPrice - b.lowestPrice);
+        return sorted.sort((a, b) => {
+          if (a.lowestPrice === null && b.lowestPrice === null) return 0;
+          if (a.lowestPrice === null) return 1;
+          if (b.lowestPrice === null) return -1;
+          return a.lowestPrice - b.lowestPrice;
+        });
       case SortBy.PRICE_DESC:
-        return sorted.sort((a, b) => b.lowestPrice - a.lowestPrice);
+        return sorted.sort((a, b) => {
+          if (a.lowestPrice === null && b.lowestPrice === null) return 0;
+          if (a.lowestPrice === null) return 1;
+          if (b.lowestPrice === null) return -1;
+          return b.lowestPrice - a.lowestPrice;
+        });
       case SortBy.RATING:
         return sorted.sort((a, b) => {
           if (a.rating === null && b.rating === null) return 0;
@@ -300,6 +311,10 @@ export class SearchService {
           }),
       );
     } else {
+      // No dates supplied: show nominal capacity and base price without
+      // performing a real-time inventory check. This is intentional — the
+      // detail page shows "what is possible" so users can choose dates.
+      // Callers that need live availability should supply checkIn + checkOut.
       roomTypes = hotel.roomTypes.map((rt) => ({
         roomTypeId: rt.id,
         name: rt.name,

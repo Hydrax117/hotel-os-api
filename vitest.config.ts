@@ -9,5 +9,8 @@ export default defineConfig({
     globals: true,
     root: './',
     include: ['**/*.spec.ts'],
+    // reflect-metadata is required by TypeScript decorators (class-validator,
+    // class-transformer). Load it once before any test file runs.
+    setupFiles: ['./src/test-setup.ts'],
   },
 });
