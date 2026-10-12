@@ -197,8 +197,10 @@ export class SearchService {
         }),
       );
 
-      // Keep only hotels that have at least one available room
-      let filtered = results.filter((h) => h.availableRooms.some((r) => r.available));
+      // Keep only hotels that have at least one available room.
+      // filteredRooms above already strips unavailable entries, so checking
+      // length > 0 is equivalent to (and clearer than) .some(r => r.available).
+      let filtered = results.filter((h) => h.availableRooms.length > 0);
 
       if (dto.minRating !== undefined) {
         filtered = filtered.filter(
@@ -221,6 +223,10 @@ export class SearchService {
     }
 
     // ── Path A: no dates ───────────────────────────────────────────────────
+    // Note: guest-count filtering is intentionally skipped here. `lowestPrice`
+    // reflects the cheapest active room type regardless of capacity, giving
+    // users a "starting from" price to browse results before selecting dates.
+    // The dates path applies a strict capacity >= guests filter instead.
     let results = hotels.map((h) => this.mapHotel(h));
 
     if (dto.minRating !== undefined) {
