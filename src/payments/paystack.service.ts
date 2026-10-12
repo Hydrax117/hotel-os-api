@@ -113,7 +113,7 @@ export class PaystackService {
     }
   }
 
-  verifyWebhookSignature(payload: string, signature: string): boolean {
+  verifyWebhookSignature(payload: Buffer, signature: string): boolean {
     const hash = crypto
       .createHmac('sha512', this.secretKey)
       .update(payload)

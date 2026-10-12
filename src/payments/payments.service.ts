@@ -7,6 +7,7 @@ import {
   ConflictException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   PaymentStatus,
   BookingStatus,
@@ -23,12 +24,17 @@ import { type RefundPaymentDto } from './dto/refund-payment.dto.js';
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
+  private readonly commissionRate: number;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly bookingsService: BookingsService,
     private readonly paystackService: PaystackService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.commissionRate =
+      this.configService.get<number>('PLATFORM_COMMISSION_RATE') ?? 0.1;
+  }
 
   async initializePayment(
     userId: string,
@@ -63,7 +69,7 @@ export class PaymentsService {
     const reference = `HOS-PAY-${booking.reference}-${Date.now()}`;
 
     const totalNgn = Number(booking.totalNgn);
-    const commission = Math.round(totalNgn * 0.1);
+    const commission = Math.round(totalNgn * this.commissionRate);
 
     const payment = await this.prisma.payment.create({
       data: {
@@ -105,13 +111,25 @@ export class PaymentsService {
     };
   }
 
-  async verifyAndConfirmPayment(reference: string): Promise<Payment> {
+  /**
+   * Verifies payment with Paystack and confirms or cancels the booking accordingly.
+   * Finding 1: userId is now required so ownership can be enforced.
+   * Pass the booking owner's userId (from payment.booking.userId) when calling
+   * from the webhook path; pass the request user's userId from the controller.
+   */
+  async verifyAndConfirmPayment(reference: string, userId: string): Promise<Payment> {
     const payment = await this.prisma.payment.findUnique({
       where: { reference },
       include: { booking: true },
     });
     if (!payment) {
       throw new NotFoundException('Payment not found');
+    }
+
+    // Ownership check — prevents any authenticated user from triggering another
+    // user's booking state transition via the verify endpoint.
+    if (payment.booking.userId !== userId) {
+      throw new ForbiddenException('You do not own this payment');
     }
 
     // Idempotent — already confirmed
@@ -158,13 +176,14 @@ export class PaymentsService {
     return payment;
   }
 
-  async handleWebhook(payload: string, signature: string): Promise<void> {
+  async handleWebhook(payload: Buffer, signature: string): Promise<void> {
+    // Finding 10: pass Buffer directly — no encoding dependency
     const valid = this.paystackService.verifyWebhookSignature(payload, signature);
     if (!valid) {
       throw new UnauthorizedException('Invalid webhook signature');
     }
 
-    const event = JSON.parse(payload) as {
+    const event = JSON.parse(payload.toString('utf-8')) as {
       event: string;
       data: { reference: string };
     };
@@ -186,7 +205,18 @@ export class PaymentsService {
       return;
     }
 
-    await this.verifyAndConfirmPayment(reference);
+    // Load payment to get the booking owner — required by verifyAndConfirmPayment
+    const payment = await this.prisma.payment.findFirst({
+      where: { reference },
+      include: { booking: true },
+    });
+    if (!payment) {
+      this.logger.warn(`Webhook received for unknown payment reference: ${reference}`);
+      return;
+    }
+
+    // Use the booking owner's userId so ownership check always passes for webhooks
+    await this.verifyAndConfirmPayment(reference, payment.booking.userId);
   }
 
   async refundPayment(
@@ -201,9 +231,8 @@ export class PaymentsService {
     if (!payment) {
       throw new NotFoundException('Payment not found');
     }
-    if (payment.booking.userId !== userId) {
-      throw new ForbiddenException('You do not own this payment');
-    }
+    // Finding 4 is access-controlled at the controller level (SUPER_ADMIN role);
+    // the service-level check ensures the payment exists and status is valid.
     if (payment.status !== PaymentStatus.SUCCESS) {
       throw new BadRequestException('Only successful payments can be refunded');
     }
@@ -218,6 +247,16 @@ export class PaymentsService {
 
     const amountNgn = dto.amountNgn ?? Number(payment.amountNgn);
 
+    // Finding 7: guard against over-refund before touching any external system
+    if (amountNgn > Number(payment.amountNgn)) {
+      throw new BadRequestException(
+        'Refund amount cannot exceed the original payment amount',
+      );
+    }
+
+    // Finding 6: create local Refund record first, then call Paystack, then update status.
+    // This way, if the DB update after Paystack succeeds fails, the record shows PENDING
+    // (submitted but not confirmed) rather than appearing as if it was never submitted.
     const refund = await this.prisma.refund.create({
       data: {
         paymentId,
@@ -227,12 +266,26 @@ export class PaymentsService {
       },
     });
 
+    // Finding 2: update Payment.status to REFUNDED before calling Paystack,
+    // so downstream guards that check payment.status !== SUCCESS work correctly.
+    await this.prisma.payment.update({
+      where: { id: paymentId },
+      data: { status: PaymentStatus.REFUNDED },
+    });
+
     await this.paystackService.createRefund(payment.reference, amountNgn * 100);
 
     const updated = await this.prisma.refund.update({
       where: { id: refund.id },
       data: { status: RefundStatus.PROCESSING },
     });
+
+    // Finding 3: cancel the booking after a successful refund submission
+    await this.bookingsService.cancelBooking(
+      payment.booking.id,
+      payment.booking.userId,
+      { reason: dto.reason },
+    );
 
     return updated;
   }
