@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Body,
   Param,
   Query,
@@ -16,10 +17,12 @@ import {
 } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { HotelsService } from './hotels.service.js';
+import { ImagesService } from './images.service.js';
 import { CreateHotelDto } from './dto/create-hotel.dto.js';
 import { UpdateHotelDto } from './dto/update-hotel.dto.js';
 import { HotelQueryDto } from './dto/hotel-query.dto.js';
 import { ApproveHotelDto } from './dto/approve-hotel.dto.js';
+import { AddImageDto } from './dto/add-image.dto.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../auth/guards/roles.guard.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
@@ -29,7 +32,10 @@ import { type JwtUser } from '../auth/strategies/jwt.strategy.js';
 @ApiTags('hotels')
 @Controller('hotels')
 export class HotelsController {
-  constructor(private hotelsService: HotelsService) {}
+  constructor(
+    private hotelsService: HotelsService,
+    private imagesService: ImagesService,
+  ) {}
 
   // PUBLIC — no auth
   @Get()
@@ -110,5 +116,55 @@ export class HotelsController {
     @Body() dto: ApproveHotelDto,
   ) {
     return this.hotelsService.updateVerificationStatus(id, dto, user.userId);
+  }
+
+  // HOTEL OWNER — images
+  @Get(':id/images')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.HOTEL_OWNER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List all images for a hotel (owner)' })
+  getImages(@Param('id') id: string, @CurrentUser() user: JwtUser) {
+    return this.imagesService.getImages(id, user.userId);
+  }
+
+  @Post(':id/images')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.HOTEL_OWNER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Add an image to a hotel (owner)' })
+  @ApiResponse({ status: 201 })
+  addImage(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtUser,
+    @Body() dto: AddImageDto,
+  ) {
+    return this.imagesService.addImage(id, user.userId, dto);
+  }
+
+  @Delete(':id/images/:imageId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.HOTEL_OWNER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete an image from a hotel (owner)' })
+  deleteImage(
+    @Param('id') id: string,
+    @Param('imageId') imageId: string,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.imagesService.deleteImage(id, imageId, user.userId);
+  }
+
+  @Patch(':id/images/:imageId/primary')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.HOTEL_OWNER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Set an image as the primary image for a hotel (owner)' })
+  setPrimary(
+    @Param('id') id: string,
+    @Param('imageId') imageId: string,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.imagesService.setPrimary(id, imageId, user.userId);
   }
 }
