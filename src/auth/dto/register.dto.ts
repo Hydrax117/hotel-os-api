@@ -20,6 +20,6 @@ export class RegisterDto {
   phone?: string;
 
   @IsOptional()
-  @IsEnum(UserRole)
-  role?: UserRole;
+  @IsEnum([UserRole.TRAVELER, UserRole.HOTEL_OWNER])
+  role?: Extract<UserRole, 'TRAVELER' | 'HOTEL_OWNER'>;
 }

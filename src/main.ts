@@ -11,8 +11,19 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api/v1');
 
+  const allowedOrigins = [
+    process.env['FRONTEND_URL'] ?? 'http://localhost:3000',
+    process.env['HOTEL_FRONTEND_URL'] ?? 'http://hotel.localhost:3000',
+  ].filter(Boolean);
+
   app.enableCors({
-    origin: process.env['FRONTEND_URL'] ?? 'http://localhost:3000',
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      // Allow requests with no origin (server-to-server, curl, mobile apps)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      callback(new Error(`Origin ${origin} not allowed by CORS`));
+    },
+    credentials: true,
   });
 
   app.useGlobalPipes(
