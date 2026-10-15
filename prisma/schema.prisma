@@ -92,6 +92,19 @@ enum SubscriptionPlan {
   ENTERPRISE
 }
 
+model HotelDocument {
+  id           String   @id @default(cuid())
+  hotelId      String
+  hotel        Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  documentType String
+  label        String?
+  url          String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([hotelId, documentType])
+}
+
 model HotelVerification {
   id          String             @id @default(cuid())
   hotelId     String             @unique
@@ -133,19 +146,6 @@ model HotelImage {
   isPrimary Boolean  @default(false)
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
-}
-
-model HotelDocument {
-  id           String   @id @default(cuid())
-  hotelId      String
-  hotel        Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  url          String
-  documentType String
-  label        String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  @@unique([hotelId, documentType])
 }
 
 model Amenity {
