@@ -18,11 +18,13 @@ import {
 import { UserRole } from '@prisma/client';
 import { HotelsService } from './hotels.service.js';
 import { ImagesService } from './images.service.js';
+import { DocumentsService } from './documents.service.js';
 import { CreateHotelDto } from './dto/create-hotel.dto.js';
 import { UpdateHotelDto } from './dto/update-hotel.dto.js';
 import { HotelQueryDto } from './dto/hotel-query.dto.js';
 import { ApproveHotelDto } from './dto/approve-hotel.dto.js';
 import { AddImageDto } from './dto/add-image.dto.js';
+import { SaveDocumentDto } from './dto/save-document.dto.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../auth/guards/roles.guard.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
@@ -35,6 +37,7 @@ export class HotelsController {
   constructor(
     private hotelsService: HotelsService,
     private imagesService: ImagesService,
+    private documentsService: DocumentsService,
   ) {}
 
   // PUBLIC — no auth
@@ -166,5 +169,42 @@ export class HotelsController {
     @CurrentUser() user: JwtUser,
   ) {
     return this.imagesService.setPrimary(id, imageId, user.userId);
+  }
+
+  // HOTEL OWNER — documents
+  @Get(':id/documents')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.HOTEL_OWNER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List all documents for a hotel (owner)' })
+  getDocuments(@Param('id') id: string, @CurrentUser() user: JwtUser) {
+    return this.documentsService.getDocuments(id, user.userId);
+  }
+
+  @Post(':id/documents')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.HOTEL_OWNER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Save a verification document for a hotel (owner)' })
+  @ApiResponse({ status: 201 })
+  saveDocument(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtUser,
+    @Body() dto: SaveDocumentDto,
+  ) {
+    return this.documentsService.saveDocument(id, user.userId, dto);
+  }
+
+  @Delete(':id/documents/:docId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.HOTEL_OWNER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete a verification document from a hotel (owner)' })
+  deleteDocument(
+    @Param('id') id: string,
+    @Param('docId') docId: string,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.documentsService.deleteDocument(id, docId, user.userId);
   }
 }

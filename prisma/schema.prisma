@@ -71,6 +71,7 @@ model Hotel {
   staff               HotelStaff[]
   roomTypes           RoomType[]
   images              HotelImage[]
+  documents           HotelDocument[]
   amenities           HotelAmenity[]
   reviews             Review[]
   verification        HotelVerification?
@@ -132,6 +133,19 @@ model HotelImage {
   isPrimary Boolean  @default(false)
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
+}
+
+model HotelDocument {
+  id           String   @id @default(cuid())
+  hotelId      String
+  hotel        Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  url          String
+  documentType String
+  label        String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([hotelId, documentType])
 }
 
 model Amenity {

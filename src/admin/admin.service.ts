@@ -174,6 +174,7 @@ export class AdminService {
         subscription: true,
         roomTypes: true,
         images: true,
+        documents: true,
         amenities: { include: { amenity: true } },
         _count: { select: { reviews: true } },
       },
