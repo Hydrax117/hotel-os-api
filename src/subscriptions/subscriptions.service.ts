@@ -342,7 +342,14 @@ export class SubscriptionsService {
       );
     }
 
-    const planFromMeta = paystackData.data.metadata.plan as SubscriptionPlan;
+    const rawPlan = paystackData.data.metadata.plan;
+    const validPlans = Object.keys(SUBSCRIPTION_PLANS) as SubscriptionPlan[];
+    if (!validPlans.includes(rawPlan as SubscriptionPlan)) {
+      throw new BadRequestException(
+        `Invalid subscription plan "${rawPlan}" received from payment provider. Please contact support.`,
+      );
+    }
+    const planFromMeta = rawPlan as SubscriptionPlan;
 
     return this.createSubscription(hotelId, ownerId, { plan: planFromMeta });
   }
