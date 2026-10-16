@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ConflictException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { type Hotel, type Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -194,6 +195,44 @@ export class HotelsService {
         isActive: isApproved,
         isPublished: isApproved,
       },
+      include: hotelInclude,
+    });
+  }
+
+  async publishHotel(hotelId: string, ownerId: string): Promise<Hotel> {
+    const hotel = await this.prisma.hotel.findUnique({ where: { id: hotelId } });
+    if (!hotel) throw new NotFoundException(`Hotel ${hotelId} not found`);
+    if (hotel.ownerId !== ownerId) throw new ForbiddenException('You do not own this hotel');
+    if (!hotel.isActive) {
+      throw new BadRequestException(
+        'Your hotel must be approved before it can be published',
+      );
+    }
+    const activeSub = await this.prisma.subscription.findFirst({
+      where: {
+        hotelId,
+        status: { in: ['ACTIVE', 'GRACE_PERIOD'] },
+      },
+    });
+    if (!hotel.subscriptionPlan && !activeSub) {
+      throw new BadRequestException(
+        'An active subscription is required to publish your hotel',
+      );
+    }
+    return this.prisma.hotel.update({
+      where: { id: hotelId },
+      data: { isPublished: true },
+      include: hotelInclude,
+    });
+  }
+
+  async unpublishHotel(hotelId: string, ownerId: string): Promise<Hotel> {
+    const hotel = await this.prisma.hotel.findUnique({ where: { id: hotelId } });
+    if (!hotel) throw new NotFoundException(`Hotel ${hotelId} not found`);
+    if (hotel.ownerId !== ownerId) throw new ForbiddenException('You do not own this hotel');
+    return this.prisma.hotel.update({
+      where: { id: hotelId },
+      data: { isPublished: false },
       include: hotelInclude,
     });
   }

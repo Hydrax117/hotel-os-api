@@ -94,6 +94,25 @@ export class HotelsController {
   }
 
   // HOTEL OWNER
+  @Patch(':id/publish')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.HOTEL_OWNER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Publish hotel (owner only)' })
+  publishHotel(@Param('id') id: string, @CurrentUser() user: JwtUser) {
+    return this.hotelsService.publishHotel(id, user.userId);
+  }
+
+  @Patch(':id/unpublish')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.HOTEL_OWNER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Unpublish hotel (owner only)' })
+  unpublishHotel(@Param('id') id: string, @CurrentUser() user: JwtUser) {
+    return this.hotelsService.unpublishHotel(id, user.userId);
+  }
+
+  // HOTEL OWNER
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.HOTEL_OWNER)

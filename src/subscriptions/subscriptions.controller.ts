@@ -13,6 +13,8 @@ import { UserRole } from '@prisma/client';
 import { SubscriptionsService } from './subscriptions.service.js';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto.js';
 import { ChangePlanDto } from './dto/change-plan.dto.js';
+import { InitializePaymentDto } from './dto/initialize-payment.dto.js';
+import { VerifyPaymentDto } from './dto/verify-payment.dto.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../auth/guards/roles.guard.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
@@ -28,6 +30,28 @@ export class SubscriptionsController {
   @Get('plans')
   getAvailablePlans() {
     return this.subscriptionsService.getAvailablePlans();
+  }
+
+  @Post('hotels/:hotelId/initialize')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.HOTEL_OWNER)
+  initializePayment(
+    @CurrentUser() user: JwtUser,
+    @Param('hotelId') hotelId: string,
+    @Body() dto: InitializePaymentDto,
+  ) {
+    return this.subscriptionsService.initializePayment(hotelId, user.userId, dto.plan);
+  }
+
+  @Post('hotels/:hotelId/verify')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.HOTEL_OWNER)
+  verifyPayment(
+    @CurrentUser() user: JwtUser,
+    @Param('hotelId') hotelId: string,
+    @Body() dto: VerifyPaymentDto,
+  ) {
+    return this.subscriptionsService.verifyPayment(hotelId, user.userId, dto.reference);
   }
 
   @Post('hotels/:hotelId')

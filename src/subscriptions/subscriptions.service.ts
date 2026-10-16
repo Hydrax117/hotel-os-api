@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   BadRequestException,
   ConflictException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import {
   SubscriptionPlan,
@@ -232,6 +233,107 @@ export class SubscriptionsService {
     }
 
     return changed;
+  }
+
+  async initializePayment(
+    hotelId: string,
+    ownerId: string,
+    plan: SubscriptionPlan,
+  ): Promise<{ authorizationUrl: string; reference: string }> {
+    await this.verifyHotelOwnership(hotelId, ownerId);
+
+    const secretKey = process.env.PAYSTACK_SECRET_KEY;
+    if (!secretKey) {
+      throw new InternalServerErrorException('Payment gateway not configured');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: ownerId },
+      select: { email: true },
+    });
+    if (!user) throw new NotFoundException('Owner not found');
+
+    const priceKobo = SUBSCRIPTION_PLANS[plan].priceNgn * 100;
+    const reference = `sub_${hotelId}_${Date.now()}`;
+    const callbackUrl =
+      (process.env.FRONTEND_URL ?? 'http://hotel.localhost:3000') +
+      '/dashboard/subscription/callback';
+
+    const paystackRes = await fetch(
+      'https://api.paystack.co/transaction/initialize',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${secretKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: user.email,
+          amount: priceKobo,
+          reference,
+          callback_url: callbackUrl,
+          metadata: { hotelId, plan, ownerId },
+        }),
+      },
+    );
+
+    const paystackData = (await paystackRes.json()) as {
+      status: boolean;
+      message: string;
+      data: { authorization_url: string; reference: string };
+    };
+
+    if (!paystackData.status) {
+      throw new BadRequestException(
+        paystackData.message ?? 'Could not initialize payment. Please try again.',
+      );
+    }
+
+    return {
+      authorizationUrl: paystackData.data.authorization_url,
+      reference: paystackData.data.reference,
+    };
+  }
+
+  async verifyPayment(
+    hotelId: string,
+    ownerId: string,
+    reference: string,
+  ): Promise<Subscription> {
+    await this.verifyHotelOwnership(hotelId, ownerId);
+
+    const secretKey = process.env.PAYSTACK_SECRET_KEY;
+    if (!secretKey) {
+      throw new InternalServerErrorException('Payment gateway not configured');
+    }
+
+    const paystackRes = await fetch(
+      `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${secretKey}`,
+        },
+      },
+    );
+
+    const paystackData = (await paystackRes.json()) as {
+      status: boolean;
+      data: {
+        status: string;
+        metadata: { plan: string; hotelId: string; ownerId: string };
+      };
+    };
+
+    if (paystackData.data.status !== 'success') {
+      throw new BadRequestException(
+        'Payment verification failed. Please try again or contact support if you were charged.',
+      );
+    }
+
+    const planFromMeta = paystackData.data.metadata.plan as SubscriptionPlan;
+
+    return this.createSubscription(hotelId, ownerId, { plan: planFromMeta });
   }
 
   // Keep SubscriptionPlan import used to satisfy TS (referenced via dto.plan type checks)
