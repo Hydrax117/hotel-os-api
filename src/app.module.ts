@@ -17,6 +17,7 @@ import { ReviewsModule } from './reviews/reviews.module.js';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { AdminModule } from './admin/admin.module.js';
+import { HotelApplicationsModule } from './hotel-applications/hotel-applications.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -58,6 +59,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     SubscriptionsModule,
     NotificationsModule,
     AdminModule,
+    HotelApplicationsModule,
   ],
   providers: [
     {

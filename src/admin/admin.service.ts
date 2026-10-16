@@ -109,7 +109,7 @@ export class AdminService {
       where: { id: hotelId },
       data: {
         verificationStatus: dto.status,
-        ...(isApproved && { isActive: true, isPublished: true }),
+        ...(isApproved && { isActive: true, isPublished: false }),
       },
     });
 

@@ -20,11 +20,12 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  hotel         Hotel?
-  hotelStaff    HotelStaff[]
-  bookings      Booking[]
-  reviews       Review[]
-  refreshTokens RefreshToken[]
+  hotel              Hotel?
+  hotelApplication   HotelApplication?
+  hotelStaff         HotelStaff[]
+  bookings           Booking[]
+  reviews            Review[]
+  refreshTokens      RefreshToken[]
 }
 
 enum UserRole {
@@ -90,6 +91,46 @@ enum SubscriptionPlan {
   STARTER
   PROFESSIONAL
   ENTERPRISE
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model HotelApplication {
+  id           String            @id @default(cuid())
+  ownerId      String            @unique
+  owner        User              @relation(fields: [ownerId], references: [id])
+  status       ApplicationStatus @default(PENDING)
+  adminNotes   String?
+
+  name         String
+  description  String?
+  address      String
+  city         String
+  state        String
+  country      String            @default("Nigeria")
+  latitude     Float?
+  longitude    Float?
+  phone        String?
+  email        String?
+  checkInTime  String            @default("14:00")
+  checkOutTime String            @default("12:00")
+
+  amenityIds   String[]
+  languages    String[]
+
+  images       Json              @default("[]")
+  documents    Json              @default("[]")
+  rooms        Json              @default("[]")
+
+  reviewedBy   String?
+  reviewedAt   DateTime?
+
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
 }
 
 model HotelDocument {
