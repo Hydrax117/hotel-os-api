@@ -256,7 +256,7 @@ export class SubscriptionsService {
     const priceKobo = SUBSCRIPTION_PLANS[plan].priceNgn * 100;
     const reference = `sub_${hotelId}_${Date.now()}`;
     const callbackUrl =
-      (process.env.FRONTEND_URL ?? 'http://hotel.localhost:3000') +
+      (process.env.HOTEL_FRONTEND_URL ?? 'http://hotel.localhost:3000') +
       '/dashboard/subscription/callback';
 
     const paystackRes = await fetch(

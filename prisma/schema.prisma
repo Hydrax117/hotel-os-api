@@ -65,7 +65,7 @@ model Hotel {
   verificationStatus  VerificationStatus  @default(PENDING)
   isActive            Boolean             @default(false)
   isPublished         Boolean             @default(false)
-  subscriptionPlan    SubscriptionPlan    @default(STARTER)
+  subscriptionPlan    SubscriptionPlan?
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
 
