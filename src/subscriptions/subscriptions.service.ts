@@ -302,6 +302,17 @@ export class SubscriptionsService {
   ): Promise<Subscription> {
     await this.verifyHotelOwnership(hotelId, ownerId);
 
+    // Idempotency check: if an active subscription already exists, return it
+    // directly so hitting this endpoint twice (e.g. browser back + forward) does
+    // not surface a 409 ConflictException to the user.
+    const existingSub = await this.prisma.subscription.findFirst({
+      where: {
+        hotelId,
+        status: { in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.GRACE_PERIOD] },
+      },
+    });
+    if (existingSub) return existingSub;
+
     const secretKey = process.env.PAYSTACK_SECRET_KEY;
     if (!secretKey) {
       throw new InternalServerErrorException('Payment gateway not configured');

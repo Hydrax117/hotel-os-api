@@ -193,7 +193,9 @@ export class HotelsService {
       data: {
         verificationStatus: dto.status,
         isActive: isApproved,
-        isPublished: isApproved,
+        // isPublished is intentionally NOT set here — the owner must subscribe
+        // and explicitly publish the hotel after approval.
+        isPublished: false,
       },
       include: hotelInclude,
     });
@@ -214,7 +216,7 @@ export class HotelsService {
         status: { in: ['ACTIVE', 'GRACE_PERIOD'] },
       },
     });
-    if (!hotel.subscriptionPlan && !activeSub) {
+    if (!activeSub) {
       throw new BadRequestException(
         'An active subscription is required to publish your hotel',
       );
