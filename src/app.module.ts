@@ -31,12 +31,16 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     }),
     BullModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        connection: {
-          host: config.get('REDIS_HOST') ?? 'localhost',
-          port: config.get<number>('REDIS_PORT') ?? 6379,
-        },
-      }),
+      useFactory: (config: ConfigService) => {
+        const tls = config.get('REDIS_TLS') === 'true';
+        return {
+          connection: {
+            host: config.get('REDIS_HOST') ?? 'localhost',
+            port: config.get<number>('REDIS_PORT') ?? 6379,
+            ...(tls && { tls: {} }),
+          },
+        };
+      },
     }),
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
