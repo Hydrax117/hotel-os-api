@@ -11,10 +11,32 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api/v1');
 
+  // Build the allowed-origins list, expanding each entry to also cover the
+  // www. variant so https://arenax.com.ng and https://www.arenax.com.ng are
+  // both accepted without needing two separate env vars.
+  function withWwwVariant(url: string): string[] {
+    try {
+      const parsed = new URL(url);
+      const variants = [url];
+      if (parsed.hostname.startsWith('www.')) {
+        // www.foo.com → also allow foo.com
+        parsed.hostname = parsed.hostname.slice(4);
+        variants.push(parsed.toString().replace(/\/$/, ''));
+      } else {
+        // foo.com → also allow www.foo.com
+        parsed.hostname = `www.${parsed.hostname}`;
+        variants.push(parsed.toString().replace(/\/$/, ''));
+      }
+      return variants;
+    } catch {
+      return [url];
+    }
+  }
+
   const allowedOrigins = [
     process.env['FRONTEND_URL'] ?? 'http://localhost:3000',
     process.env['HOTEL_FRONTEND_URL'] ?? 'http://hotel.localhost:3000',
-  ].filter(Boolean);
+  ].flatMap(withWwwVariant);
 
   console.log('[CORS] Allowed origins:', allowedOrigins);
 
