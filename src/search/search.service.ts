@@ -110,7 +110,15 @@ export class SearchService {
 
     if (dto.city) where.city = { contains: dto.city, mode: 'insensitive' };
     if (dto.state) where.state = { contains: dto.state, mode: 'insensitive' };
-    if (dto.q) where.name = { contains: dto.q, mode: 'insensitive' };
+    if (dto.q) {
+      // Match against name, city, or state so users can type a city name
+      // (e.g. "lagos") and still get results.
+      where.OR = [
+        { name: { contains: dto.q, mode: 'insensitive' } },
+        { city: { contains: dto.q, mode: 'insensitive' } },
+        { state: { contains: dto.q, mode: 'insensitive' } },
+      ];
+    }
 
     if (dto.amenities?.length) {
       where.AND = dto.amenities.map((name) => ({
