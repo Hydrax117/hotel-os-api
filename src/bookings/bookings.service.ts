@@ -9,6 +9,7 @@ import { BookingStatus, type Booking, type Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { InventoryService } from '../inventory/inventory.service.js';
 import { type CreateBookingDto } from './dto/create-booking.dto.js';
+import { type CreateWalkInDto } from './dto/create-walk-in.dto.js';
 import { type CancelBookingDto } from './dto/cancel-booking.dto.js';
 import { type UpdateBookingStatusDto } from './dto/update-booking-status.dto.js';
 import { type BookingQueryDto } from './dto/booking-query.dto.js';
@@ -375,5 +376,89 @@ export class BookingsService {
     }
 
     return expiredBookings.length;
+  }
+
+  /**
+   * Walk-in booking: created by hotel staff for a guest who shows up in person.
+   * Skips payment — booking is immediately CHECKED_IN.
+   * Staff user must be the hotel owner or active staff member.
+   */
+  async createWalkIn(
+    hotelId: string,
+    staffUserId: string,
+    dto: CreateWalkInDto,
+  ): Promise<Booking> {
+    const hotel = await this.prisma.hotel.findUnique({
+      where: { id: hotelId },
+      include: { staff: true },
+    });
+    if (!hotel) throw new NotFoundException('Hotel not found');
+
+    const isOwner = hotel.ownerId === staffUserId;
+    const isStaff = hotel.staff.some((s) => s.userId === staffUserId && s.isActive);
+    if (!isOwner && !isStaff) {
+      throw new ForbiddenException('You do not have access to this hotel');
+    }
+
+    const roomType = await this.prisma.roomType.findUnique({
+      where: { id: dto.roomTypeId },
+    });
+    if (!roomType || roomType.hotelId !== hotelId) {
+      throw new NotFoundException('Room type not found');
+    }
+
+    const checkInDate  = new Date(dto.checkIn  + 'T00:00:00Z');
+    const checkOutDate = new Date(dto.checkOut + 'T00:00:00Z');
+    const nights = Math.round(
+      (checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24),
+    );
+    if (nights < 1) throw new BadRequestException('Check-out must be after check-in');
+
+    const availability = await this.inventoryService.checkAvailability(dto.roomTypeId, {
+      checkIn:  dto.checkIn,
+      checkOut: dto.checkOut,
+      guests:   dto.guests,
+    });
+    if (!availability.available) {
+      throw new BadRequestException('No rooms available for the selected dates');
+    }
+
+    const pricing = this.calculatePricing(availability.pricePerNight, nights);
+
+    let reference: string;
+    do {
+      reference = this.generateReference();
+    } while (await this.prisma.booking.findUnique({ where: { reference } }));
+
+    // Confirm inventory immediately (no hold needed for walk-ins)
+    await this.inventoryService.holdInventory(dto.roomTypeId, checkInDate, checkOutDate);
+    await this.inventoryService.confirmBooking(dto.roomTypeId, checkInDate, checkOutDate);
+
+    const booking = await this.prisma.booking.create({
+      data: {
+        reference,
+        userId:         staffUserId,   // staff member acts on behalf of the guest
+        hotelId,
+        roomTypeId:     dto.roomTypeId,
+        checkIn:        checkInDate,
+        checkOut:       checkOutDate,
+        nights,
+        guests:         dto.guests,
+        guestFirstName: dto.guestFirstName,
+        guestLastName:  dto.guestLastName,
+        guestEmail:     dto.guestEmail,
+        guestPhone:     dto.guestPhone,
+        specialRequests: dto.specialRequests,
+        status:         BookingStatus.CHECKED_IN,
+        subtotalNgn:    pricing.subtotalNgn,
+        serviceFeeNgn:  pricing.serviceFeeNgn,
+        totalNgn:       pricing.totalNgn,
+        confirmedAt:    new Date(),
+        isWalkIn:       true,
+      },
+      include: { hotel: true, roomType: true },
+    });
+
+    return booking;
   }
 }

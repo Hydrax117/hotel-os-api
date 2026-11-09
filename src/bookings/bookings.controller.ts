@@ -2,6 +2,7 @@ import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from '@ne
 import { ApiTags } from '@nestjs/swagger';
 import { BookingsService } from './bookings.service.js';
 import { CreateBookingDto } from './dto/create-booking.dto.js';
+import { CreateWalkInDto } from './dto/create-walk-in.dto.js';
 import { CancelBookingDto } from './dto/cancel-booking.dto.js';
 import { UpdateBookingStatusDto } from './dto/update-booking-status.dto.js';
 import { BookingQueryDto } from './dto/booking-query.dto.js';
@@ -67,5 +68,20 @@ export class BookingsController {
     @Body() dto: UpdateBookingStatusDto,
   ) {
     return this.bookingsService.updateBookingStatus(id, user.userId, dto);
+  }
+
+  /**
+   * Walk-in booking: hotel staff creates a booking for a guest who arrives in person.
+   * No payment required — booking goes straight to CHECKED_IN.
+   * POST /api/v1/bookings/hotel/:hotelId/walk-in
+   */
+  @Post('hotel/:hotelId/walk-in')
+  @UseGuards(JwtAuthGuard)
+  createWalkIn(
+    @CurrentUser() user: JwtUser,
+    @Param('hotelId') hotelId: string,
+    @Body() dto: CreateWalkInDto,
+  ) {
+    return this.bookingsService.createWalkIn(hotelId, user.userId, dto);
   }
 }

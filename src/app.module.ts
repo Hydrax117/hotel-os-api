@@ -19,6 +19,8 @@ import { NotificationsModule } from './notifications/notifications.module.js';
 import { AdminModule } from './admin/admin.module.js';
 import { HotelApplicationsModule } from './hotel-applications/hotel-applications.module.js';
 
+import { ApiKeysModule } from './api-keys/api-keys.module.js';
+
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
 @Module({
@@ -64,6 +66,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     NotificationsModule,
     AdminModule,
     HotelApplicationsModule,
+    ApiKeysModule,
   ],
   providers: [
     {

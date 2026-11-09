@@ -78,6 +78,7 @@ model Hotel {
   verification        HotelVerification?
   subscription        Subscription?
   bookings            Booking[]
+  apiKeys             ApiKey[]
 }
 
 enum VerificationStatus {
@@ -287,11 +288,26 @@ model Booking {
   confirmedAt        DateTime?
   cancelledAt        DateTime?
   cancellationReason String?
+  isWalkIn           Boolean       @default(false)
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
   payment            Payment?
   review             Review?
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  hotelId     String
+  hotel       Hotel     @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  name        String                        // e.g. "Opera PMS", "Custom integration"
+  keyHash     String    @unique             // bcrypt hash of the raw key
+  prefix      String                        // first 12 chars shown in UI e.g. "hos_live_abcd"
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 enum BookingStatus {
