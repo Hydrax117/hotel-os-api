@@ -241,6 +241,22 @@ export class BookingsService {
       );
     }
 
+    if (dto.status === BookingStatus.CHECKED_OUT) {
+      await this.inventoryService.releaseBooking(
+        booking.roomTypeId,
+        new Date(booking.checkIn),
+        new Date(booking.checkOut),
+      );
+    }
+
+    if (dto.status === BookingStatus.NO_SHOW) {
+      await this.inventoryService.releaseBooking(
+        booking.roomTypeId,
+        new Date(booking.checkIn),
+        new Date(booking.checkOut),
+      );
+    }
+
     const updateData: Prisma.BookingUpdateInput = { status: dto.status };
     if (dto.status === BookingStatus.CANCELLED) {
       updateData.cancelledAt = new Date();
