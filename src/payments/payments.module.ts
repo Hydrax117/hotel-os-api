@@ -9,6 +9,6 @@ import { PaystackService } from './paystack.service.js';
   imports: [PrismaModule, BookingsModule],
   controllers: [PaymentsController],
   providers: [PaymentsService, PaystackService],
-  exports: [PaymentsService],
+  exports: [PaymentsService, PaystackService],
 })
 export class PaymentsModule {}

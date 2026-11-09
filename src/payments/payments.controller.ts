@@ -85,4 +85,24 @@ export class PaymentsController {
   ) {
     return this.paymentsService.refundPayment(paymentId, user.userId, dto);
   }
+
+  /** Initialize payment for a stay extension */
+  @Post('extension/initialize')
+  @UseGuards(JwtAuthGuard)
+  async initializeExtensionPayment(
+    @CurrentUser() user: JwtUser,
+    @Body() body: { bookingId: string; newCheckOut: string; email: string; callbackUrl?: string },
+  ) {
+    return this.paymentsService.initializeExtensionPayment(user.userId, body);
+  }
+
+  /** Verify extension payment and apply new check-out */
+  @Get('extension/verify/:reference')
+  @UseGuards(JwtAuthGuard)
+  async verifyExtensionPayment(
+    @Param('reference') reference: string,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.paymentsService.verifyExtensionPayment(reference, user.userId);
+  }
 }

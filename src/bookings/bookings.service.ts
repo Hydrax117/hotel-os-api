@@ -270,7 +270,7 @@ export class BookingsService {
   async getMyBookings(
     userId: string,
     query: BookingQueryDto,
-  ): Promise<{ bookings: Booking[]; total: number }> {
+  ): Promise<{ bookings: (Booking & { hasReview: boolean })[]; total: number }> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 10;
     const where: Prisma.BookingWhereInput = {
@@ -287,12 +287,19 @@ export class BookingsService {
         include: {
           hotel: { select: { name: true, city: true, state: true } },
           roomType: { select: { name: true, bedType: true } },
+          review: { select: { id: true } },
         },
       }),
       this.prisma.booking.count({ where }),
     ]);
 
-    return { bookings, total };
+    return {
+      bookings: bookings.map(b => ({
+        ...b,
+        hasReview: b.review !== null,
+      })),
+      total,
+    };
   }
 
   async getHotelBookings(
@@ -460,5 +467,127 @@ export class BookingsService {
     });
 
     return booking;
+  }
+
+  /**
+   * Check availability for a stay extension.
+   * Returns pricing for the extra nights if available.
+   */
+  async checkExtensionAvailability(
+    bookingId: string,
+    userId: string,
+    newCheckOut: string,
+  ): Promise<{ available: boolean; extraNights: number; extraAmountNgn: number; pricePerNight: number }> {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { roomType: true },
+    });
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (booking.userId !== userId) throw new ForbiddenException();
+    if (booking.status !== BookingStatus.CHECKED_IN) {
+      throw new BadRequestException('You can only extend an active (checked-in) stay');
+    }
+
+    const newCheckOutDate = new Date(newCheckOut + 'T00:00:00Z');
+    const currentCheckOut = new Date(booking.checkOut);
+
+    if (newCheckOutDate <= currentCheckOut) {
+      throw new BadRequestException('New check-out must be after the current check-out date');
+    }
+
+    const extraNights = Math.round(
+      (newCheckOutDate.getTime() - currentCheckOut.getTime()) / (1000 * 60 * 60 * 24),
+    );
+
+    // Check inventory from current checkOut to new checkOut
+    const availability = await this.inventoryService.checkAvailability(booking.roomTypeId, {
+      checkIn: currentCheckOut.toISOString().slice(0, 10),
+      checkOut: newCheckOut,
+      guests: booking.guests,
+    });
+
+    if (!availability.available) {
+      return { available: false, extraNights, extraAmountNgn: 0, pricePerNight: availability.pricePerNight };
+    }
+
+    const pricing = this.calculatePricing(availability.pricePerNight, extraNights);
+
+    return {
+      available: true,
+      extraNights,
+      extraAmountNgn: pricing.totalNgn,
+      pricePerNight: availability.pricePerNight,
+    };
+  }
+
+  /**
+   * Extend a stay: update checkOut + inventory, create BookingExtension record.
+   * Payment is handled separately via payments — this confirms the extension.
+   */
+  async confirmExtension(
+    bookingId: string,
+    userId: string,
+    newCheckOut: string,
+  ): Promise<Booking> {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { roomType: true },
+    });
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (booking.userId !== userId) throw new ForbiddenException();
+    if (booking.status !== BookingStatus.CHECKED_IN) {
+      throw new BadRequestException('Booking must be CHECKED_IN to extend');
+    }
+
+    const newCheckOutDate = new Date(newCheckOut + 'T00:00:00Z');
+    const currentCheckOut = new Date(booking.checkOut);
+
+    if (newCheckOutDate <= currentCheckOut) {
+      throw new BadRequestException('New check-out must be after the current check-out date');
+    }
+
+    const extraNights = Math.round(
+      (newCheckOutDate.getTime() - currentCheckOut.getTime()) / (1000 * 60 * 60 * 24),
+    );
+
+    const availability = await this.inventoryService.checkAvailability(booking.roomTypeId, {
+      checkIn: currentCheckOut.toISOString().slice(0, 10),
+      checkOut: newCheckOut,
+      guests: booking.guests,
+    });
+    if (!availability.available) {
+      throw new BadRequestException('No availability for the requested extension dates');
+    }
+
+    const pricing = this.calculatePricing(availability.pricePerNight, extraNights);
+
+    // Hold + confirm inventory for the extra nights
+    await this.inventoryService.holdInventory(booking.roomTypeId, currentCheckOut, newCheckOutDate);
+    await this.inventoryService.confirmBooking(booking.roomTypeId, currentCheckOut, newCheckOutDate);
+
+    const updatedBooking = await this.prisma.booking.update({
+      where: { id: bookingId },
+      data: {
+        checkOut: newCheckOutDate,
+        nights: booking.nights + extraNights,
+        subtotalNgn: Number(booking.subtotalNgn) + pricing.subtotalNgn,
+        serviceFeeNgn: Number(booking.serviceFeeNgn) + pricing.serviceFeeNgn,
+        totalNgn: Number(booking.totalNgn) + pricing.totalNgn,
+      },
+      include: { hotel: true, roomType: true },
+    });
+
+    // Record the extension
+    await this.prisma.bookingExtension.create({
+      data: {
+        bookingId,
+        prevCheckOut: currentCheckOut,
+        newCheckOut: newCheckOutDate,
+        extraNights,
+        extraAmountNgn: pricing.totalNgn,
+      },
+    });
+
+    return updatedBooking;
   }
 }

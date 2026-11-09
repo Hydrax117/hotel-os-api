@@ -331,4 +331,115 @@ export class PaymentsService {
       orderBy: { createdAt: 'desc' },
     });
   }
+
+  /**
+   * Initialize payment for a stay extension.
+   * Creates a new Payment record linked to the booking and returns a Paystack URL.
+   * The extension is confirmed by verifyExtensionPayment once payment succeeds.
+   */
+  async initializeExtensionPayment(
+    userId: string,
+    dto: { bookingId: string; newCheckOut: string; email: string; callbackUrl?: string },
+  ): Promise<{ paymentUrl: string; reference: string }> {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: dto.bookingId },
+      include: { roomType: true },
+    });
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (booking.userId !== userId) throw new ForbiddenException('You do not own this booking');
+    if (booking.status !== BookingStatus.CHECKED_IN) {
+      throw new BadRequestException('Booking must be CHECKED_IN to extend');
+    }
+
+    const newCheckOutDate = new Date(dto.newCheckOut + 'T00:00:00Z');
+    const currentCheckOut = new Date(booking.checkOut);
+    if (newCheckOutDate <= currentCheckOut) {
+      throw new BadRequestException('New check-out must be after the current check-out date');
+    }
+
+    const extraNights = Math.round(
+      (newCheckOutDate.getTime() - currentCheckOut.getTime()) / (1000 * 60 * 60 * 24),
+    );
+
+    const pricePerNight = Number(booking.roomType.pricePerNight);
+    const subtotal = pricePerNight * extraNights;
+    const serviceFee = Math.round(subtotal * 0.03);
+    const total = subtotal + serviceFee;
+
+    const reference = `HOS-EXT-${booking.reference}-${Date.now()}`;
+    const commission = Math.round(total * this.commissionRate);
+
+    // Create a new Payment record for the extension
+    const payment = await this.prisma.payment.create({
+      data: {
+        bookingId: dto.bookingId,
+        reference,
+        amountNgn: total,
+        commissionNgn: commission,
+        netNgn: total - commission,
+        status: PaymentStatus.PENDING,
+      },
+    });
+
+    let result: Awaited<ReturnType<PaystackService['initializeTransaction']>>;
+    try {
+      result = await this.paystackService.initializeTransaction({
+        email: dto.email,
+        amount: total * 100,
+        reference,
+        callbackUrl: dto.callbackUrl,
+        metadata: { bookingId: dto.bookingId, userId, newCheckOut: dto.newCheckOut, isExtension: true },
+      });
+    } catch (error) {
+      await this.prisma.payment.update({
+        where: { id: payment.id },
+        data: { status: PaymentStatus.FAILED },
+      });
+      throw error;
+    }
+
+    return { paymentUrl: result.authorizationUrl, reference };
+  }
+
+  /**
+   * Verify extension payment and apply the new check-out date.
+   */
+  async verifyExtensionPayment(reference: string, userId: string): Promise<{ status: string; booking: unknown }> {
+    const payment = await this.prisma.payment.findUnique({
+      where: { reference },
+      include: { booking: true },
+    });
+    if (!payment) throw new NotFoundException('Payment not found');
+    if (payment.booking.userId !== userId) throw new ForbiddenException();
+
+    if (payment.status === PaymentStatus.SUCCESS) {
+      return { status: 'already_confirmed', booking: payment.booking };
+    }
+
+    const result = await this.paystackService.verifyTransaction(reference);
+
+    if (result.status === 'success') {
+      await this.prisma.payment.update({
+        where: { id: payment.id },
+        data: { status: PaymentStatus.SUCCESS, paidAt: new Date(), providerRef: result.reference },
+      });
+
+      // Extract newCheckOut from Paystack metadata
+      const meta = result.metadata as { newCheckOut?: string } | undefined;
+      if (meta?.newCheckOut) {
+        // Delegate to bookings service via direct call
+        // We import BookingsService — circular dependency safe because it's already injected
+        await this.bookingsService.confirmExtension(payment.booking.id, userId, meta.newCheckOut);
+      }
+
+      const updated = await this.prisma.booking.findUnique({ where: { id: payment.booking.id } });
+      return { status: 'success', booking: updated };
+    }
+
+    await this.prisma.payment.update({
+      where: { id: payment.id },
+      data: { status: PaymentStatus.FAILED, failedAt: new Date() },
+    });
+    return { status: 'failed', booking: payment.booking };
+  }
 }

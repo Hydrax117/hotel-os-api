@@ -25,6 +25,7 @@ model User {
   hotelStaff         HotelStaff[]
   bookings           Booking[]
   reviews            Review[]
+  serviceOrders      ServiceOrder[]
   refreshTokens      RefreshToken[]
 }
 
@@ -79,6 +80,8 @@ model Hotel {
   subscription        Subscription?
   bookings            Booking[]
   apiKeys             ApiKey[]
+  serviceVenues       ServiceVenue[]
+  roomServiceEnabled  Boolean             @default(false)
 }
 
 enum VerificationStatus {
@@ -294,6 +297,8 @@ model Booking {
 
   payment            Payment?
   review             Review?
+  serviceOrders      ServiceOrder[]
+  extensions         BookingExtension[]
 }
 
 model ApiKey {
@@ -442,4 +447,119 @@ model Review {
   respondedAt      DateTime?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+}
+
+// ─── Stay Extension ──────────────────────────────────────────────────────────
+
+model BookingExtension {
+  id               String   @id @default(cuid())
+  bookingId        String
+  booking          Booking  @relation(fields: [bookingId], references: [id])
+  /// Check-out date before this extension
+  prevCheckOut     DateTime @db.Date
+  /// Check-out date after this extension
+  newCheckOut      DateTime @db.Date
+  extraNights      Int
+  extraAmountNgn   Decimal  @db.Decimal(12, 2)
+  createdAt        DateTime @default(now())
+}
+
+// ─── Room Service ────────────────────────────────────────────────────────────
+
+model ServiceVenue {
+  id          String             @id @default(cuid())
+  hotelId     String
+  hotel       Hotel              @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  name        String             // e.g. "The Rooftop Restaurant", "Pool Bar"
+  type        ServiceVenueType
+  description String?
+  isActive    Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  menuItems   ServiceMenuItem[]
+  orders      ServiceOrder[]
+}
+
+enum ServiceVenueType {
+  RESTAURANT
+  BAR
+  CAFE
+  ROOM_SERVICE
+  OTHER
+}
+
+model ServiceMenuItem {
+  id          String       @id @default(cuid())
+  venueId     String
+  venue       ServiceVenue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  category    String       // e.g. "Starters", "Mains", "Drinks"
+  priceNgn    Decimal      @db.Decimal(12, 2)
+  isAvailable Boolean      @default(true)
+  imageUrl    String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  orderItems  ServiceOrderItem[]
+}
+
+model ServiceOrder {
+  id          String             @id @default(cuid())
+  reference   String             @unique
+  bookingId   String
+  booking     Booking            @relation(fields: [bookingId], references: [id])
+  venueId     String
+  venue       ServiceVenue       @relation(fields: [venueId], references: [id])
+  userId      String
+  user        User               @relation(fields: [userId], references: [id])
+  status      ServiceOrderStatus @default(PENDING)
+  totalNgn    Decimal            @db.Decimal(12, 2)
+  notes       String?            // special requests / delivery notes
+  roomNumber  String?
+  payment     ServicePayment?
+  items       ServiceOrderItem[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+}
+
+enum ServiceOrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  DELIVERED
+  CANCELLED
+}
+
+model ServiceOrderItem {
+  id         String          @id @default(cuid())
+  orderId    String
+  order      ServiceOrder    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId String
+  menuItem   ServiceMenuItem @relation(fields: [menuItemId], references: [id])
+  quantity   Int
+  unitPrice  Decimal         @db.Decimal(12, 2)
+  lineTotal  Decimal         @db.Decimal(12, 2)
+}
+
+model ServicePayment {
+  id          String               @id @default(cuid())
+  orderId     String               @unique
+  order       ServiceOrder         @relation(fields: [orderId], references: [id])
+  reference   String               @unique
+  amountNgn   Decimal              @db.Decimal(12, 2)
+  status      ServicePaymentStatus @default(PENDING)
+  provider    String               @default("paystack")
+  providerRef String?
+  paidAt      DateTime?
+  failedAt    DateTime?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+}
+
+enum ServicePaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
 }

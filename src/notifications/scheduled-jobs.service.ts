@@ -88,4 +88,64 @@ export class ScheduledJobsService {
       );
     }
   }
+
+  @Cron('0 8 * * *', { timeZone: 'UTC' })
+  async sendCheckOutReminders(): Promise<void> {
+    try {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setUTCHours(0, 0, 0, 0);
+      const dayAfter = new Date(tomorrow);
+      dayAfter.setDate(dayAfter.getDate() + 1);
+
+      // Find all bookings checking out tomorrow that are currently checked in
+      const bookings = await this.prisma.booking.findMany({
+        where: {
+          checkOut: { gte: tomorrow, lt: dayAfter },
+          status: BookingStatus.CHECKED_IN,
+        },
+        include: { user: true, hotel: { include: { owner: true } } },
+      });
+
+      for (const booking of bookings) {
+        // Remind the guest
+        await this.notificationsService.queueNotification(
+          NotificationJobType.CHECK_OUT_REMINDER,
+          {
+            guestEmail: booking.guestEmail,
+            guestName: `${booking.guestFirstName} ${booking.guestLastName}`,
+            hotelName: booking.hotel.name,
+            bookingReference: booking.reference,
+            checkOut: booking.checkOut.toISOString().slice(0, 10),
+            checkOutTime: booking.hotel.checkOutTime,
+            recipientType: 'guest',
+          },
+        );
+
+        // Remind the hotel owner/management
+        await this.notificationsService.queueNotification(
+          NotificationJobType.CHECK_OUT_REMINDER,
+          {
+            guestEmail: booking.hotel.owner.email,
+            guestName: `${booking.hotel.owner.firstName} ${booking.hotel.owner.lastName}`,
+            hotelName: booking.hotel.name,
+            bookingReference: booking.reference,
+            guestFullName: `${booking.guestFirstName} ${booking.guestLastName}`,
+            checkOut: booking.checkOut.toISOString().slice(0, 10),
+            checkOutTime: booking.hotel.checkOutTime,
+            recipientType: 'management',
+          },
+        );
+      }
+
+      if (bookings.length > 0) {
+        this.logger.log(`Queued ${bookings.length} check-out reminder notifications`);
+      }
+    } catch (err) {
+      this.logger.error(
+        'Failed to send check-out reminders',
+        err instanceof Error ? err.stack : String(err),
+      );
+    }
+  }
 }

@@ -71,6 +71,34 @@ export class BookingsController {
   }
 
   /**
+   * Check availability for extending a stay.
+   * GET /api/v1/bookings/:id/extension/check?newCheckOut=YYYY-MM-DD
+   */
+  @Get(':id/extension/check')
+  @UseGuards(JwtAuthGuard)
+  checkExtension(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Query('newCheckOut') newCheckOut: string,
+  ) {
+    return this.bookingsService.checkExtensionAvailability(id, user.userId, newCheckOut);
+  }
+
+  /**
+   * Confirm and apply a stay extension (called after payment succeeds).
+   * POST /api/v1/bookings/:id/extension
+   */
+  @Post(':id/extension')
+  @UseGuards(JwtAuthGuard)
+  confirmExtension(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() body: { newCheckOut: string },
+  ) {
+    return this.bookingsService.confirmExtension(id, user.userId, body.newCheckOut);
+  }
+
+  /**
    * Walk-in booking: hotel staff creates a booking for a guest who arrives in person.
    * No payment required — booking goes straight to CHECKED_IN.
    * POST /api/v1/bookings/hotel/:hotelId/walk-in
