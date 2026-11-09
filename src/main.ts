@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 import { AppModule, ObserveInstrument } from './app.module';
 
 async function bootstrap() {
@@ -10,6 +11,9 @@ async function bootstrap() {
   });
 
   app.setGlobalPrefix('api/v1');
+
+  // ── Socket.IO adapter ─────────────────────────────────────────────────────
+  app.useWebSocketAdapter(new IoAdapter(app));
 
   // Build the allowed-origins list, expanding each entry to also cover the
   // www. variant so https://arenax.com.ng and https://www.arenax.com.ng are
