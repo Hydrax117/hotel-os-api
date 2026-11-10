@@ -1,6 +1,8 @@
 import {
   Injectable,
   Logger,
+  Inject,
+  forwardRef,
   NotFoundException,
   BadRequestException,
   ForbiddenException,
@@ -8,6 +10,7 @@ import {
 import { BookingStatus, type Booking, type Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { InventoryService } from '../inventory/inventory.service.js';
+import { NotificationsGateway } from '../notifications/notifications.gateway.js';
 import { type CreateBookingDto } from './dto/create-booking.dto.js';
 import { type CreateWalkInDto } from './dto/create-walk-in.dto.js';
 import { type CancelBookingDto } from './dto/cancel-booking.dto.js';
@@ -21,6 +24,8 @@ export class BookingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventoryService: InventoryService,
+    @Inject(forwardRef(() => NotificationsGateway))
+    private readonly notificationsGateway: NotificationsGateway,
   ) {}
 
   private generateReference(): string {
@@ -101,6 +106,28 @@ export class BookingsService {
         },
         include: { hotel: true, roomType: true },
       });
+
+      // 🔔 REAL-TIME NOTIFICATION: Notify restaurant staff of new booking
+      this.notificationsGateway.notifyNewOrder(dto.hotelId, {
+        bookingId: booking.id,
+        reference: booking.reference,
+        guestName: `${booking.guestFirstName} ${booking.guestLastName}`,
+        guestPhone: booking.guestPhone,
+        guestEmail: booking.guestEmail,
+        roomType: roomType.name,
+        checkIn: booking.checkIn.toISOString().split('T')[0],
+        checkOut: booking.checkOut.toISOString().split('T')[0],
+        nights: booking.nights,
+        guests: booking.guests,
+        specialRequests: booking.specialRequests,
+        totalPrice: booking.totalNgn,
+        status: booking.status,
+      });
+
+      this.logger.log(
+        `[BOOKING] New booking ${booking.reference} created for hotel ${dto.hotelId} - Notifying staff in real-time`,
+      );
+
       return booking;
     } catch (error) {
       await this.inventoryService.releaseHold(dto.roomTypeId, checkInDate, checkOutDate);
@@ -143,11 +170,29 @@ export class BookingsService {
       new Date(booking.checkOut),
     );
 
-    return this.prisma.booking.update({
+    const confirmedBooking = await this.prisma.booking.update({
       where: { id: bookingId },
       data: { status: BookingStatus.CONFIRMED, confirmedAt: new Date() },
       include: { hotel: true, roomType: true },
     });
+
+    // 🔔 REAL-TIME NOTIFICATION: Notify restaurant of booking confirmation
+    this.notificationsGateway.notifyBookingConfirmed(confirmedBooking.hotelId, {
+      bookingId: confirmedBooking.id,
+      reference: confirmedBooking.reference,
+      guestName: `${confirmedBooking.guestFirstName} ${confirmedBooking.guestLastName}`,
+      guestPhone: confirmedBooking.guestPhone,
+      roomType: confirmedBooking.roomType.name,
+      checkIn: confirmedBooking.checkIn.toISOString().split('T')[0],
+      checkOut: confirmedBooking.checkOut.toISOString().split('T')[0],
+      status: 'CONFIRMED',
+    });
+
+    this.logger.log(
+      `[BOOKING] Booking ${confirmedBooking.reference} confirmed - Real-time notification sent to hotel ${confirmedBooking.hotelId}`,
+    );
+
+    return confirmedBooking;
   }
 
   async cancelBooking(
@@ -191,7 +236,7 @@ export class BookingsService {
       );
     }
 
-    return this.prisma.booking.update({
+    const cancelledBooking = await this.prisma.booking.update({
       where: { id: bookingId },
       data: {
         status: BookingStatus.CANCELLED,
@@ -199,6 +244,21 @@ export class BookingsService {
         cancellationReason: dto.reason ?? null,
       },
     });
+
+    // 🔔 REAL-TIME NOTIFICATION: Notify restaurant of booking cancellation
+    this.notificationsGateway.notifyBookingCancelled(booking.hotelId, {
+      bookingId: cancelledBooking.id,
+      reference: cancelledBooking.reference,
+      guestName: `${cancelledBooking.guestFirstName} ${cancelledBooking.guestLastName}`,
+      reason: dto.reason || 'No reason provided',
+      cancelledAt: cancelledBooking.cancelledAt?.toISOString(),
+    });
+
+    this.logger.log(
+      `[BOOKING] Booking ${cancelledBooking.reference} cancelled - Real-time notification sent to hotel ${booking.hotelId}`,
+    );
+
+    return cancelledBooking;
   }
 
   async updateBookingStatus(
@@ -264,7 +324,27 @@ export class BookingsService {
       updateData.cancellationReason = dto.reason ?? null;
     }
 
-    return this.prisma.booking.update({ where: { id: bookingId }, data: updateData });
+    const updatedBooking = await this.prisma.booking.update({
+      where: { id: bookingId },
+      data: updateData,
+      include: { hotel: true, roomType: true },
+    });
+
+    // 🔔 REAL-TIME NOTIFICATION: Notify restaurant of status update
+    this.notificationsGateway.notifyOrderStatusUpdate(booking.hotelId, {
+      bookingId: updatedBooking.id,
+      reference: updatedBooking.reference,
+      guestName: `${updatedBooking.guestFirstName} ${updatedBooking.guestLastName}`,
+      previousStatus: booking.status,
+      newStatus: updatedBooking.status,
+      updatedAt: new Date().toISOString(),
+    });
+
+    this.logger.log(
+      `[BOOKING] Booking ${updatedBooking.reference} status updated to ${updatedBooking.status} - Real-time notification sent`,
+    );
+
+    return updatedBooking;
   }
 
   async getMyBookings(

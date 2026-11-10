@@ -9,7 +9,7 @@ import { BookingStatus, ServiceOrderStatus, ServicePaymentStatus } from '@prisma
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaystackService } from '../payments/paystack.service.js';
-import { RoomServiceGateway } from './room-service.gateway.js';
+import { NotificationsGateway } from '../notifications/notifications.gateway.js';
 import { type CreateVenueDto } from './dto/create-venue.dto.js';
 import { type CreateMenuItemDto } from './dto/create-menu-item.dto.js';
 import { type PlaceOrderDto } from './dto/place-order.dto.js';
@@ -23,7 +23,7 @@ export class RoomServiceService {
     private readonly prisma: PrismaService,
     private readonly paystackService: PaystackService,
     private readonly configService: ConfigService,
-    private readonly gateway: RoomServiceGateway,
+    private readonly notificationsGateway: NotificationsGateway,
   ) {}
 
   // ─── Hotel management ──────────────────────────────────────────────────────
@@ -294,7 +294,22 @@ export class RoomServiceService {
       });
 
       // 🔔 Real-time push to hotel dashboard
-      this.gateway.emitNewOrder(confirmedOrder.venue.hotelId, confirmedOrder);
+      this.notificationsGateway.notifyNewOrder(confirmedOrder.venue.hotelId, {
+        type: 'room-service-order',
+        orderId: confirmedOrder.id,
+        reference: confirmedOrder.reference,
+        guestName: `${confirmedOrder.booking.guestFirstName} ${confirmedOrder.booking.guestLastName}`,
+        venueName: confirmedOrder.venue.name,
+        items: confirmedOrder.items.map(i => ({
+          name: i.menuItem?.name,
+          quantity: i.quantity,
+          lineTotal: Number(i.lineTotal),
+        })),
+        totalNgn: Number(confirmedOrder.totalNgn),
+        notes: confirmedOrder.notes,
+        roomNumber: confirmedOrder.roomNumber,
+        status: confirmedOrder.status,
+      });
 
       return { status: 'success', orderId: payment.orderId };
     }
@@ -400,7 +415,8 @@ export class RoomServiceService {
       data: { status: dto.status },
     }).then(updated => {
       // 🔔 Broadcast status change to hotel dashboard
-      this.gateway.emitOrderUpdate(order.venue.hotelId, {
+      this.notificationsGateway.notifyOrderStatusUpdate(order.venue.hotelId, {
+        type: 'room-service-order-updated',
         orderId: updated.id,
         status: updated.status,
       });
