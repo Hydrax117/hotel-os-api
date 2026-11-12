@@ -414,12 +414,12 @@ export class RoomServiceService {
       where: { id: orderId },
       data: { status: dto.status },
     }).then(updated => {
-      // 🔔 Broadcast status change to hotel dashboard
+      // 🔔 Broadcast status change to hotel dashboard AND the guest
       this.notificationsGateway.notifyOrderStatusUpdate(order.venue.hotelId, {
         type: 'room-service-order-updated',
         orderId: updated.id,
         status: updated.status,
-      });
+      }, order.userId);
       return updated;
     });
   }

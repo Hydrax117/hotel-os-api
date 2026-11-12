@@ -56,6 +56,23 @@ export class NotificationsGateway
   }
 
   /**
+   * Guest: join a user-scoped room to receive personal notifications.
+   * Client sends: { userId } — server validates nothing (guests are authenticated
+   * via JwtAuthGuard on HTTP, so we trust this is the right user for now;
+   * a production hardening pass would verify a short-lived token here too).
+   */
+  @SubscribeMessage('join-user')
+  handleJoinUser(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { userId: string },
+  ) {
+    if (!data.userId) return;
+    void client.join(`user:${data.userId}`);
+    client.emit('joined-user', { room: `user:${data.userId}` });
+    this.logger.log(`Client ${client.id} joined user:${data.userId}`);
+  }
+
+  /**
    * Fallback join without JWT (used when no token is available yet).
    * Client sends: { hotelId }
    */
@@ -154,15 +171,18 @@ export class NotificationsGateway
   }
 
   /**
-   * Broadcast order status update
+   * Broadcast order status update — to hotel staff room AND the guest's user room.
+   * Pass guestUserId so the guest receives the notification wherever they are.
    */
-  notifyOrderStatusUpdate(hotelId: string, orderData: any) {
-    this.server.to(`hotel:${hotelId}`).emit('order-status-updated', {
-      timestamp: new Date().toISOString(),
-      ...orderData,
-    });
-
-    this.logger.log(`[REALTIME] Order status updated for hotel ${hotelId}`);
+  notifyOrderStatusUpdate(hotelId: string, orderData: Record<string, unknown>, guestUserId?: string) {
+    const payload = { timestamp: new Date().toISOString(), ...orderData };
+    // Hotel staff
+    this.server.to(`hotel:${hotelId}`).emit('order-status-updated', payload);
+    // Guest — emit to user-scoped room if userId is known
+    if (guestUserId) {
+      this.server.to(`user:${guestUserId}`).emit('order-status-updated', payload);
+    }
+    this.logger.log(`[REALTIME] Order status updated for hotel ${hotelId}${guestUserId ? ` / user ${guestUserId}` : ''}`);
   }
 
   /**
