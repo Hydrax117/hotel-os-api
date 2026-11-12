@@ -60,7 +60,7 @@ async function bootstrap() {
   );
 
   const config = new DocumentBuilder()
-    .setTitle('Hotel OS API')
+    .setTitle('Lodgen API')
     .setVersion('1.0')
     .addBearerAuth()
     .build();

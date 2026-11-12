@@ -81,7 +81,7 @@ export class NotificationsService {
   async sendWelcomeEmail(user: WelcomeEmailData): Promise<void> {
     await this.mailerService.sendMail({
       to: user.email,
-      subject: 'Welcome to Hotel OS',
+      subject: 'Welcome to Lodgen',
       template: 'welcome',
       context: user,
     });
@@ -90,7 +90,7 @@ export class NotificationsService {
   async sendHotelApprovedEmail(hotel: HotelApprovedData): Promise<void> {
     await this.mailerService.sendMail({
       to: hotel.ownerEmail,
-      subject: `Your hotel ${hotel.hotelName} is now live on Hotel OS`,
+      subject: `Your hotel ${hotel.hotelName} is now live on Lodgen`,
       template: 'hotel-approved',
       context: hotel,
     });

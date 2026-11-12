@@ -37,7 +37,7 @@ import { PrismaModule } from '../prisma/prisma.module.js';
             pass: config.get('SMTP_PASS') ?? '',
           },
         },
-        defaults: { from: config.get('SMTP_FROM') ?? '"Hotel OS" <noreply@hotel-os.com>' },
+        defaults: { from: config.get('SMTP_FROM') ?? '"Lodgen" <noreply@lodgen.com>' },
         template: {
           dir: join(process.cwd(), 'src/notifications/templates'),
           adapter: new HandlebarsAdapter(),

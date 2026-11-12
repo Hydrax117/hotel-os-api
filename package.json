@@ -1,6 +1,7 @@
 {
-  "name": "hotel-os-api",
+  "name": "lodgen-api",
   "version": "0.0.1",
+  "description": "Lodgen — Hospitality infrastructure API",
   "description": "",
   "author": "",
   "private": true,
