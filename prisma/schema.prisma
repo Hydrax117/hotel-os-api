@@ -82,6 +82,7 @@ model Hotel {
   apiKeys             ApiKey[]
   serviceVenues       ServiceVenue[]
   roomServiceEnabled  Boolean             @default(false)
+  promotions          Promotion[]
 }
 
 enum VerificationStatus {
@@ -447,6 +448,29 @@ model Review {
   respondedAt      DateTime?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+}
+
+// ─── Promotions ──────────────────────────────────────────────────────────────
+
+model Promotion {
+  id                  String        @id @default(cuid())
+  hotelId             String
+  hotel               Hotel         @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  name                String
+  discountType        DiscountType
+  discountValue       Decimal       @db.Decimal(10, 2)
+  validFrom           DateTime      @db.Date
+  validTo             DateTime      @db.Date
+  minNights           Int           @default(1)
+  advanceBookingDays  Int           @default(0)
+  active              Boolean       @default(true)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
 }
 
 // ─── Stay Extension ──────────────────────────────────────────────────────────

@@ -113,11 +113,16 @@ export class PaymentsService {
 
   /**
    * Verifies payment with Paystack and confirms or cancels the booking accordingly.
+   * Returns the payment record augmented with bookingId so callers can redirect
+   * to the correct booking confirmation page without an extra lookup.
    * Finding 1: userId is now required so ownership can be enforced.
    * Pass the booking owner's userId (from payment.booking.userId) when calling
    * from the webhook path; pass the request user's userId from the controller.
    */
-  async verifyAndConfirmPayment(reference: string, userId: string): Promise<Payment> {
+  async verifyAndConfirmPayment(
+    reference: string,
+    userId: string,
+  ): Promise<Payment & { bookingId: string }> {
     const payment = await this.prisma.payment.findUnique({
       where: { reference },
       include: { booking: true },
@@ -134,7 +139,7 @@ export class PaymentsService {
 
     // Idempotent — already confirmed
     if (payment.status === PaymentStatus.SUCCESS) {
-      return payment;
+      return { ...payment, bookingId: payment.booking.id };
     }
 
     const result = await this.paystackService.verifyTransaction(reference);
@@ -153,7 +158,7 @@ export class PaymentsService {
         payment.booking.id,
         payment.booking.userId,
       );
-      return updated;
+      return { ...updated, bookingId: payment.booking.id };
     }
 
     if (result.status === 'failed' || result.status === 'abandoned') {
@@ -170,10 +175,10 @@ export class PaymentsService {
         payment.booking.userId,
         { reason: 'Payment failed' },
       );
-      return updated;
+      return { ...updated, bookingId: payment.booking.id };
     }
 
-    return payment;
+    return { ...payment, bookingId: payment.booking.id };
   }
 
   async handleWebhook(payload: Buffer, signature: string): Promise<void> {

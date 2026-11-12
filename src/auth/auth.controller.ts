@@ -51,7 +51,7 @@ export class AuthController {
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  me(@CurrentUser() user: JwtUser): JwtUser {
-    return user;
+  me(@CurrentUser() user: JwtUser) {
+    return this.authService.getMe(user.userId);
   }
 }
