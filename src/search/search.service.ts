@@ -267,6 +267,19 @@ export class SearchService {
       images: true,
       amenities: { include: { amenity: true } },
       roomTypes: { where: { isActive: true } },
+      // Include resources with their images and category
+      resources: {
+        where: {
+          lifecycleStatus: 'ACTIVE',
+          isBookable: true,
+          marketplaceVisibility: 'PUBLIC',
+        },
+        include: {
+          images: { orderBy: [{ isPrimary: 'desc' as const }, { sortOrder: 'asc' as const }] },
+          category: { include: { resourceType: true } },
+        },
+        orderBy: { code: 'asc' as const },
+      },
       reviews: {
         select: {
           overallRating: true,
@@ -325,10 +338,6 @@ export class SearchService {
           }),
       );
     } else {
-      // No dates supplied: show nominal capacity and base price without
-      // performing a real-time inventory check. This is intentional — the
-      // detail page shows "what is possible" so users can choose dates.
-      // Callers that need live availability should supply checkIn + checkOut.
       roomTypes = hotel.roomTypes.map((rt) => ({
         roomTypeId: rt.id,
         name: rt.name,
@@ -340,6 +349,31 @@ export class SearchService {
       }));
     }
 
+    // Map resources to the same RoomAvailability shape so the frontend
+    // can render them in the same list (with their photos).
+    // Resources don't have an InventoryDay model yet — show them as
+    // available with no price (0) until rate plans are wired up.
+    type ResourceWithImages = typeof hotel.resources[number];
+    const resourceRooms: RoomAvailability[] = (hotel.resources as ResourceWithImages[]).map((r) => ({
+      roomTypeId: r.id,
+      name: r.name,
+      bedType: r.attributes && typeof r.attributes === 'object' && 'bedConfiguration' in (r.attributes as object)
+        ? String((r.attributes as Record<string, unknown>)['bedConfiguration'])
+        : r.category.name,
+      capacity: r.capacity ?? 1,
+      pricePerNight: 0, // Rate plans not yet wired — show 0 / "Contact for pricing"
+      availableRooms: 1,
+      available: true,
+      images: r.images.map((img) => ({
+        url: img.url,
+        isPrimary: img.isPrimary,
+        caption: img.caption,
+      })),
+      bookingUnit: r.bookingUnit,
+      isResource: true,
+      description: r.description,
+    }));
+
     // Build a hotelSearchInclude-compatible shape for mapHotel
     const hotelForMap = {
       ...hotel,
@@ -349,7 +383,7 @@ export class SearchService {
 
     const base = this.mapHotel(
       hotelForMap,
-      roomTypes,
+      [...roomTypes, ...resourceRooms],
       checkIn ?? null,
       checkOut ?? null,
       nights,
@@ -357,7 +391,6 @@ export class SearchService {
 
     return {
       ...base,
-      // Full review list (overrides the stripped-down one from mapHotel)
       fullReviews: hotel.reviews,
       images: hotel.images,
       verification: hotel.verification,
