@@ -22,6 +22,7 @@ import { HotelApplicationsModule } from './hotel-applications/hotel-applications
 import { ApiKeysModule } from './api-keys/api-keys.module.js';
 import { RoomServiceModule } from './room-service/room-service.module.js';
 import { PromotionsModule } from './promotions/promotions.module.js';
+import { ResourcesModule } from './resources/resources.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -71,6 +72,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     ApiKeysModule,
     RoomServiceModule,
     PromotionsModule,
+    ResourcesModule,
   ],
   providers: [
     {
