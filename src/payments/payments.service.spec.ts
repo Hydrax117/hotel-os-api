@@ -103,7 +103,10 @@ vi.mock('./paystack.service.js', () => ({
 import { PaymentsService } from './payments.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { BookingsService } from '../bookings/bookings.service.js';
+import { InventoryService } from '../inventory/inventory.service.js';
+import { NotificationsGateway } from '../notifications/notifications.gateway.js';
 import { PaystackService } from './paystack.service.js';
+import { ConfigService } from '@nestjs/config';
 import {
   PaymentStatus,
   BookingStatus,
@@ -132,11 +135,11 @@ function buildService() {
       update: ReturnType<typeof vi.fn>;
     };
   };
-  const bookings = new BookingsService() as unknown as {
+  const bookings = new BookingsService({} as PrismaService, {} as InventoryService, {} as NotificationsGateway) as unknown as {
     confirmBooking: ReturnType<typeof vi.fn>;
     cancelBooking: ReturnType<typeof vi.fn>;
   };
-  const paystack = new PaystackService() as unknown as {
+  const paystack = new PaystackService({} as ConfigService) as unknown as {
     initializeTransaction: ReturnType<typeof vi.fn>;
     verifyTransaction: ReturnType<typeof vi.fn>;
     verifyWebhookSignature: ReturnType<typeof vi.fn>;

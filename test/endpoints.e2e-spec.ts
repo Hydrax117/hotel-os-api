@@ -118,7 +118,7 @@ describe('Hotel OS API Endpoints - E2E Tests', () => {
           password: 'TestPassword123!',
           firstName: 'John',
           lastName: 'Doe',
-          role: UserRole.GUEST,
+          role: UserRole.TRAVELER,
         });
       expect(res.status).toBe(201);
       expect(res.body.accessToken).toBeDefined();
