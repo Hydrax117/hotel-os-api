@@ -83,6 +83,12 @@ model Hotel {
   serviceVenues       ServiceVenue[]
   roomServiceEnabled  Boolean             @default(false)
   promotions          Promotion[]
+
+  // Resource-based inventory
+  resourceCategories  ResourceCategory[]
+  buildings           Building[]
+  floors              Floor[]
+  resources           Resource[]
 }
 
 enum VerificationStatus {
@@ -486,6 +492,166 @@ model BookingExtension {
   extraNights      Int
   extraAmountNgn   Decimal  @db.Decimal(12, 2)
   createdAt        DateTime @default(now())
+}
+
+// ─── Resource-Based Inventory ────────────────────────────────────────────────
+//
+// ResourceType  — system-level classification (ACCOMMODATION, EVENT_SPACE, etc.)
+// ResourceCategory — hotel-defined commercial grouping (Standard Room, VIP Lounge…)
+// Building / Floor — optional physical structure
+// Resource       — an actual physical or capacity-managed unit
+// ResourceImage  — photos attached to a resource (mirrors HotelImage pattern)
+
+model ResourceType {
+  id              String             @id @default(cuid())
+  code            String             @unique  // e.g. ACCOMMODATION
+  name            String
+  description     String?
+  defaultBookable Boolean            @default(true) @map("default_bookable")
+  createdAt       DateTime           @default(now()) @map("created_at")
+
+  categories      ResourceCategory[]
+
+  @@map("resource_types")
+}
+
+enum BookingUnit {
+  NIGHT
+  HOUR
+  DAY
+  SESSION
+  CUSTOM
+}
+
+enum ResourceLifecycleStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum ResourceOperationalStatus {
+  READY
+  DIRTY
+  OCCUPIED
+  INSPECTION
+  MAINTENANCE
+  OUT_OF_SERVICE
+}
+
+enum ResourceMarketplaceVisibility {
+  PRIVATE
+  UNLISTED
+  PUBLIC
+}
+
+model ResourceCategory {
+  id                           String             @id @default(cuid())
+  hotelId                      String             @map("hotel_id")
+  resourceTypeId               String             @map("resource_type_id")
+  name                         String
+  code                         String             // unique within hotel
+  description                  String?
+  defaultBookingUnit           BookingUnit        @default(NIGHT) @map("default_booking_unit")
+  defaultCapacity              Int?               @map("default_capacity")
+  defaultMinimumDurationMinutes Int?              @map("default_minimum_duration_minutes")
+  defaultMaximumDurationMinutes Int?              @map("default_maximum_duration_minutes")
+  isActive                     Boolean            @default(true) @map("is_active")
+  createdAt                    DateTime           @default(now()) @map("created_at")
+  updatedAt                    DateTime           @updatedAt @map("updated_at")
+
+  hotel                        Hotel              @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  resourceType                 ResourceType       @relation(fields: [resourceTypeId], references: [id])
+  resources                    Resource[]
+
+  @@unique([hotelId, code])
+  @@index([hotelId, resourceTypeId])
+  @@map("resource_categories")
+}
+
+model Building {
+  id        String   @id @default(cuid())
+  hotelId   String   @map("hotel_id")
+  name      String
+  code      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  hotel     Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  floors    Floor[]
+  resources Resource[]
+
+  @@unique([hotelId, code])
+  @@map("buildings")
+}
+
+model Floor {
+  id          String   @id @default(cuid())
+  hotelId     String   @map("hotel_id")
+  buildingId  String   @map("building_id")
+  name        String
+  levelNumber Int      @map("level_number")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  hotel       Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  building    Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  resources   Resource[]
+
+  @@index([hotelId, buildingId])
+  @@map("floors")
+}
+
+model Resource {
+  id                       String                        @id @default(cuid())
+  hotelId                  String                        @map("hotel_id")
+  resourceCategoryId       String                        @map("resource_category_id")
+  buildingId               String?                       @map("building_id")
+  floorId                  String?                       @map("floor_id")
+  name                     String
+  code                     String                        // unique within hotel e.g. "101", "VIP-LOUNGE-A"
+  description              String?
+  bookingUnit              BookingUnit                   @default(NIGHT) @map("booking_unit")
+  isBookable               Boolean                       @default(true) @map("is_bookable")
+  marketplaceVisibility    ResourceMarketplaceVisibility @default(PRIVATE) @map("marketplace_visibility")
+  lifecycleStatus          ResourceLifecycleStatus       @default(ACTIVE) @map("lifecycle_status")
+  operationalStatus        ResourceOperationalStatus     @default(READY) @map("operational_status")
+  capacity                 Int?
+  minimumCapacity          Int?                          @map("minimum_capacity")
+  minimumDurationMinutes   Int?                          @map("minimum_duration_minutes")
+  maximumDurationMinutes   Int?                          @map("maximum_duration_minutes")
+  bufferBeforeMinutes      Int                           @default(0) @map("buffer_before_minutes")
+  bufferAfterMinutes       Int                           @default(0) @map("buffer_after_minutes")
+  attributes               Json?                         // flexible: bedConfiguration, bathroom, etc.
+  internalNotes            String?                       @map("internal_notes")
+  archivedAt               DateTime?                     @map("archived_at")
+  createdAt                DateTime                      @default(now()) @map("created_at")
+  updatedAt                DateTime                      @updatedAt @map("updated_at")
+
+  hotel                    Hotel                         @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  category                 ResourceCategory              @relation(fields: [resourceCategoryId], references: [id])
+  building                 Building?                     @relation(fields: [buildingId], references: [id])
+  floor                    Floor?                        @relation(fields: [floorId], references: [id])
+  images                   ResourceImage[]
+
+  @@unique([hotelId, code])
+  @@index([hotelId, resourceCategoryId])
+  @@index([hotelId, lifecycleStatus, isBookable])
+  @@map("resources")
+}
+
+model ResourceImage {
+  id         String   @id @default(cuid())
+  resourceId String   @map("resource_id")
+  url        String
+  caption    String?
+  isPrimary  Boolean  @default(false) @map("is_primary")
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@index([resourceId])
+  @@map("resource_images")
 }
 
 // ─── Room Service ────────────────────────────────────────────────────────────
