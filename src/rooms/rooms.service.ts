@@ -4,12 +4,9 @@ import {
   ForbiddenException,
   BadRequestException,
   ConflictException,
-  Inject,
-  forwardRef,
 } from '@nestjs/common';
 import { type Room, type RoomType, BookingStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { InventoryService } from '../inventory/inventory.service.js';
 import { CreateRoomTypeDto } from './dto/create-room-type.dto.js';
 import { UpdateRoomTypeDto } from './dto/update-room-type.dto.js';
 import { CreateRoomDto } from './dto/create-room.dto.js';
@@ -17,11 +14,7 @@ import { UpdateRoomStatusDto } from './dto/update-room-status.dto.js';
 
 @Injectable()
 export class RoomsService {
-  constructor(
-    private prisma: PrismaService,
-    @Inject(forwardRef(() => InventoryService))
-    private inventoryService: InventoryService,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
   // ─── Room Types ────────────────────────────────────────────────────────────
 
@@ -49,9 +42,6 @@ export class RoomsService {
       },
       include: { rooms: true },
     });
-
-    // Pre-populate 90 days of inventory
-    await this.inventoryService.ensureInventoryExists(roomType.id, 90);
 
     return roomType;
   }

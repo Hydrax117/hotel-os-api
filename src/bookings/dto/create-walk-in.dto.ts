@@ -10,9 +10,9 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateWalkInDto {
-  @ApiProperty({ example: 'room-type-id' })
+  @ApiProperty({ example: 'resource-id' })
   @IsString()
-  roomTypeId: string;
+  resourceId: string;
 
   @ApiProperty({ example: '2026-11-09' })
   @IsDateString()
