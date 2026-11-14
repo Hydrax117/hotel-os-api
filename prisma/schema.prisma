@@ -279,8 +279,12 @@ model Booking {
   user               User          @relation(fields: [userId], references: [id])
   hotelId            String
   hotel              Hotel         @relation(fields: [hotelId], references: [id])
-  roomTypeId         String
-  roomType           RoomType      @relation(fields: [roomTypeId], references: [id])
+  // New resource-based inventory — resourceId is the primary link
+  resourceId         String?
+  resource           Resource?     @relation(fields: [resourceId], references: [id])
+  // Legacy room type — kept nullable for historical records
+  roomTypeId         String?
+  roomType           RoomType?     @relation(fields: [roomTypeId], references: [id])
   checkIn            DateTime      @db.Date
   checkOut           DateTime      @db.Date
   nights             Int
@@ -632,6 +636,8 @@ model Resource {
   building                 Building?                     @relation(fields: [buildingId], references: [id])
   floor                    Floor?                        @relation(fields: [floorId], references: [id])
   images                   ResourceImage[]
+  bookings                 Booking[]
+  availabilityBlocks       AvailabilityBlock[]
 
   @@unique([hotelId, code])
   @@index([hotelId, resourceCategoryId])
@@ -652,6 +658,23 @@ model ResourceImage {
 
   @@index([resourceId])
   @@map("resource_images")
+}
+
+model AvailabilityBlock {
+  id               String   @id @default(cuid())
+  propertyId       String   @map("property_id")
+  resourceId       String   @map("resource_id")
+  startAt          DateTime @map("start_at")
+  endAt            DateTime @map("end_at")
+  reason           String   @default("OTHER")
+  notes            String?
+  createdByUserId  String?  @map("created_by_user_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  resource         Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@index([resourceId, startAt, endAt])
+  @@map("availability_blocks")
 }
 
 // ─── Room Service ────────────────────────────────────────────────────────────

@@ -348,7 +348,6 @@ export class PaymentsService {
   ): Promise<{ paymentUrl: string; reference: string }> {
     const booking = await this.prisma.booking.findUnique({
       where: { id: dto.bookingId },
-      include: { roomType: true },
     });
     if (!booking) throw new NotFoundException('Booking not found');
     if (booking.userId !== userId) throw new ForbiddenException('You do not own this booking');
@@ -366,7 +365,8 @@ export class PaymentsService {
       (newCheckOutDate.getTime() - currentCheckOut.getTime()) / (1000 * 60 * 60 * 24),
     );
 
-    const pricePerNight = Number(booking.roomType.pricePerNight);
+    // Rate plans not yet wired — extension price is 0 until implemented
+    const pricePerNight = 0;
     const subtotal = pricePerNight * extraNights;
     const serviceFee = Math.round(subtotal * 0.03);
     const total = subtotal + serviceFee;
@@ -432,9 +432,24 @@ export class PaymentsService {
       // Extract newCheckOut from Paystack metadata
       const meta = result.metadata as { newCheckOut?: string } | undefined;
       if (meta?.newCheckOut) {
-        // Delegate to bookings service via direct call
-        // We import BookingsService — circular dependency safe because it's already injected
-        await this.bookingsService.confirmExtension(payment.booking.id, userId, meta.newCheckOut);
+        // Update the booking checkout date directly
+        const newCO = new Date(meta.newCheckOut + 'T00:00:00Z');
+        const extraNights = Math.round(
+          (newCO.getTime() - new Date(payment.booking.checkOut).getTime()) / 86_400_000,
+        );
+        await this.prisma.booking.update({
+          where: { id: payment.booking.id },
+          data: { checkOut: newCO, nights: { increment: extraNights } },
+        });
+        await this.prisma.bookingExtension.create({
+          data: {
+            bookingId:   payment.booking.id,
+            prevCheckOut: new Date(payment.booking.checkOut),
+            newCheckOut:  newCO,
+            extraNights,
+            extraAmountNgn: 0,
+          },
+        });
       }
 
       const updated = await this.prisma.booking.findUnique({ where: { id: payment.booking.id } });

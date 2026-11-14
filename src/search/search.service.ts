@@ -13,6 +13,10 @@ const hotelSearchInclude = {
   images: { where: { isPrimary: true }, take: 1 },
   amenities: { include: { amenity: true } },
   roomTypes: { where: { isActive: true } },
+  resources: {
+    where: { lifecycleStatus: 'ACTIVE', isBookable: true, marketplaceVisibility: 'PUBLIC' },
+    select: { id: true },
+  },
   reviews: { select: { overallRating: true } },
   _count: { select: { reviews: true } },
 } satisfies Prisma.HotelInclude;
@@ -51,7 +55,6 @@ export class SearchService {
       reviewCount: hotel._count.reviews,
       primaryImageUrl: hotel.images[0]?.url ?? null,
       amenities: hotel.amenities.map((a) => a.amenity.name),
-      // null when no active room types exist (distinguishable from "free" by consumers)
       lowestPrice:
         hotel.roomTypes.length > 0
           ? Math.min(...hotel.roomTypes.map((r) => Number(r.pricePerNight)))
@@ -162,46 +165,27 @@ export class SearchService {
 
       const results = await Promise.all(
         hotels.map(async (hotel) => {
-          // Only check room types that meet the guest capacity requirement
-          const eligibleRoomTypes = hotel.roomTypes.filter(
-            (rt) => rt.capacity >= guests,
-          );
+          const eligibleResources = hotel.resources ?? [];
 
           const roomAvailabilities = await Promise.all(
-            eligibleRoomTypes.map(async (rt) => {
-              const avail = await this.inventoryService.checkAvailability(
-                rt.id,
-                { checkIn: dto.checkIn!, checkOut: dto.checkOut!, guests },
-              );
+            eligibleResources.map(async (r) => {
+              const avail = await this.inventoryService.checkAvailability(r.id, {
+                checkIn: dto.checkIn!, checkOut: dto.checkOut!, guests,
+              });
               return {
-                roomTypeId: rt.id,
-                name: rt.name,
-                bedType: rt.bedType,
-                capacity: rt.capacity,
-                pricePerNight: avail.pricePerNight,
-                availableRooms: avail.availableRooms,
-                available: avail.available,
-              } satisfies RoomAvailability;
-            }),
+                roomTypeId:     r.id,
+                name:           '',
+                bedType:        '',
+                capacity:       1,
+                pricePerNight:  0,
+                availableRooms: avail.availableCount,
+                available:      avail.available,
+                isResource:     true,
+              } satisfies RoomAvailability;            }),
           );
 
-          // Apply price filter against real availability prices
-          const filteredRooms = roomAvailabilities.filter((r) => {
-            if (!r.available) return false;
-            if (dto.minPrice !== undefined && r.pricePerNight < dto.minPrice)
-              return false;
-            if (dto.maxPrice !== undefined && r.pricePerNight > dto.maxPrice)
-              return false;
-            return true;
-          });
-
-          return this.mapHotel(
-            hotel,
-            filteredRooms,
-            dto.checkIn!,
-            dto.checkOut!,
-            nights,
-          );
+          const filteredRooms = roomAvailabilities.filter(r => r.available);
+          return this.mapHotel(hotel, filteredRooms, dto.checkIn!, dto.checkOut!, nights);
         }),
       );
 
@@ -316,63 +300,42 @@ export class SearchService {
       nights = Math.round(
         (checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24),
       );
-
-      roomTypes = await Promise.all(
-        hotel.roomTypes
-          .filter((rt) => rt.capacity >= guestCount)
-          .map(async (rt) => {
-            const avail = await this.inventoryService.checkAvailability(rt.id, {
-              checkIn,
-              checkOut,
-              guests: guestCount,
-            });
-            return {
-              roomTypeId: rt.id,
-              name: rt.name,
-              bedType: rt.bedType,
-              capacity: rt.capacity,
-              pricePerNight: avail.pricePerNight,
-              availableRooms: avail.availableRooms,
-              available: avail.available,
-            } satisfies RoomAvailability;
-          }),
-      );
-    } else {
-      roomTypes = hotel.roomTypes.map((rt) => ({
-        roomTypeId: rt.id,
-        name: rt.name,
-        bedType: rt.bedType,
-        capacity: rt.capacity,
-        pricePerNight: Number(rt.pricePerNight),
-        availableRooms: rt.totalRooms,
-        available: true,
-      }));
     }
+
+    // roomTypes array is empty — all bookable inventory is now in resources
+    roomTypes = [];
 
     // Map resources to the same RoomAvailability shape so the frontend
     // can render them in the same list (with their photos).
     // Resources don't have an InventoryDay model yet — show them as
     // available with no price (0) until rate plans are wired up.
     type ResourceWithImages = typeof hotel.resources[number];
-    const resourceRooms: RoomAvailability[] = (hotel.resources as ResourceWithImages[]).map((r) => ({
-      roomTypeId: r.id,
-      name: r.name,
-      bedType: r.attributes && typeof r.attributes === 'object' && 'bedConfiguration' in (r.attributes as object)
-        ? String((r.attributes as Record<string, unknown>)['bedConfiguration'])
-        : r.category.name,
-      capacity: r.capacity ?? 1,
-      pricePerNight: 0, // Rate plans not yet wired — show 0 / "Contact for pricing"
-      availableRooms: 1,
-      available: true,
-      images: r.images.map((img) => ({
-        url: img.url,
-        isPrimary: img.isPrimary,
-        caption: img.caption,
-      })),
-      bookingUnit: r.bookingUnit,
-      isResource: true,
-      description: r.description,
-    }));
+    const resourceRooms: RoomAvailability[] = await Promise.all(
+      (hotel.resources as ResourceWithImages[]).map(async (r) => {
+        let available = true;
+        if (checkIn && checkOut) {
+          const avail = await this.inventoryService.checkAvailability(r.id, {
+            checkIn, checkOut, guests: guestCount,
+          });
+          available = avail.available;
+        }
+        return {
+          roomTypeId: r.id,
+          name: r.name,
+          bedType: r.attributes && typeof r.attributes === 'object' && 'bedConfiguration' in (r.attributes as object)
+            ? String((r.attributes as Record<string, unknown>)['bedConfiguration'])
+            : r.category.name,
+          capacity: r.capacity ?? 1,
+          pricePerNight: 0,
+          availableRooms: available ? 1 : 0,
+          available,
+          images: r.images.map((img) => ({ url: img.url, isPrimary: img.isPrimary, caption: img.caption })),
+          bookingUnit: r.bookingUnit,
+          isResource: true,
+          description: r.description,
+        } satisfies RoomAvailability;
+      }),
+    );
 
     // Build a hotelSearchInclude-compatible shape for mapHotel
     const hotelForMap = {

@@ -167,3 +167,26 @@ INSERT INTO "resource_types" ("id", "code", "name", "description", "default_book
   ('rtype_event_space',        'EVENT_SPACE',          'Event Space',         'Conference rooms, event halls and other bookable event spaces', true),
   ('rtype_scheduled_facility', 'SCHEDULED_FACILITY',  'Scheduled Facility',  'Spa treatment rooms, pool sessions and other scheduled slots', true),
   ('rtype_general_facility',   'GENERAL_FACILITY',    'General Facility',    'Non-bookable facilities such as gym, shared pool, lobby', false);
+
+-- ─── AvailabilityBlock (was missing from initial migration) ──────────────────
+
+CREATE TABLE IF NOT EXISTS "availability_blocks" (
+  "id"                 TEXT NOT NULL,
+  "property_id"        TEXT NOT NULL,
+  "resource_id"        TEXT NOT NULL,
+  "start_at"           TIMESTAMPTZ NOT NULL,
+  "end_at"             TIMESTAMPTZ NOT NULL,
+  "reason"             TEXT NOT NULL DEFAULT 'OTHER',
+  "notes"              TEXT,
+  "created_by_user_id" TEXT,
+  "created_at"         TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  CONSTRAINT "availability_blocks_pkey" PRIMARY KEY ("id")
+);
+
+CREATE INDEX IF NOT EXISTS "availability_blocks_resource_id_start_at_end_at_idx"
+  ON "availability_blocks"("resource_id", "start_at", "end_at");
+
+ALTER TABLE "availability_blocks"
+  ADD CONSTRAINT "availability_blocks_resource_id_fkey"
+    FOREIGN KEY ("resource_id") REFERENCES "resources"("id") ON DELETE CASCADE;

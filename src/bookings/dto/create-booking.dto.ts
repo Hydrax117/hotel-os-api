@@ -2,7 +2,7 @@ import { IsString, IsDateString, IsInt, Min, IsEmail, IsOptional, MinLength } fr
 
 export class CreateBookingDto {
   @IsString() hotelId: string;
-  @IsString() roomTypeId: string;
+  @IsString() resourceId: string;
   @IsDateString() checkIn: string;
   @IsDateString() checkOut: string;
   @IsInt() @Min(1) guests: number;
