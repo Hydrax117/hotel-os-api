@@ -6,6 +6,13 @@ export type RoomAvailability = {
   pricePerNight: number;
   availableRooms: number;
   available: boolean;
+  /** Images from the resource model (populated for resource-based entries) */
+  images?: { url: string; isPrimary: boolean; caption: string | null }[];
+  /** Booking unit — NIGHT for rooms, HOUR for lounges etc. */
+  bookingUnit?: string;
+  /** True when this row comes from the new Resource model */
+  isResource?: boolean;
+  description?: string | null;
 };
 
 export type HotelSearchResult = {
