@@ -48,7 +48,9 @@ export class BookingsService {
     const hotel = await this.prisma.hotel.findUnique({ where: { id: dto.hotelId } });
     if (!hotel || !hotel.isActive || !hotel.isPublished) throw new NotFoundException('Hotel not found');
 
-    const resource = await this.prisma.resource.findUnique({ where: { id: dto.resourceId } });
+    const resource = await this.prisma.resource.findUnique({
+      where: { id: dto.resourceId },
+    });
     if (!resource || resource.hotelId !== dto.hotelId) throw new NotFoundException('Resource not found');
     if (!resource.isBookable || resource.lifecycleStatus !== 'ACTIVE') {
       throw new BadRequestException('This resource is not bookable');
@@ -64,7 +66,8 @@ export class BookingsService {
     });
     if (!avail.available) throw new BadRequestException('Resource unavailable for selected dates');
 
-    const pricing = this.calcPricing(0, nights); // rate plans not yet wired
+    const pricePerNight = resource.pricePerNight ? Number(resource.pricePerNight) : 0;
+    const pricing = this.calcPricing(pricePerNight, nights);
 
     let reference: string;
     do { reference = this.generateReference(); }
@@ -303,7 +306,8 @@ export class BookingsService {
     });
     if (!avail.available) throw new BadRequestException('No availability for selected dates');
 
-    const pricing = this.calcPricing(0, nights);
+    const pricePerNight = resource.pricePerNight ? Number(resource.pricePerNight) : 0;
+    const pricing = this.calcPricing(pricePerNight, nights);
 
     let reference: string;
     do { reference = this.generateReference(); }

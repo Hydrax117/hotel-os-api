@@ -248,6 +248,7 @@ export class ResourcesService {
         bufferAfterMinutes: dto.bufferAfterMinutes ?? 0,
         attributes: dto.attributes as Prisma.InputJsonValue,
         internalNotes: dto.internalNotes,
+        pricePerNight: dto.pricePerNight ?? null,
       },
       include: {
         category: { include: { resourceType: true } },
@@ -409,6 +410,7 @@ export class ResourcesService {
         bufferAfterMinutes: dto.bufferAfterMinutes,
         attributes: dto.attributes as Prisma.InputJsonValue,
         internalNotes: dto.internalNotes,
+        ...(dto.pricePerNight !== undefined && { pricePerNight: dto.pricePerNight }),
       },
       include: {
         category: { include: { resourceType: true } },

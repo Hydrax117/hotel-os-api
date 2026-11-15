@@ -71,6 +71,13 @@ export class PaymentsService {
     const totalNgn = Number(booking.totalNgn);
     const commission = Math.round(totalNgn * this.commissionRate);
 
+    // Guard: Paystack rejects 0-amount transactions
+    if (totalNgn <= 0) {
+      throw new BadRequestException(
+        'This resource has no price set. Please contact the hotel to set a price before booking.',
+      );
+    }
+
     const payment = await this.prisma.payment.create({
       data: {
         bookingId: dto.bookingId,
