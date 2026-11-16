@@ -1,6 +1,7 @@
 import {
   Injectable, Logger, Inject, forwardRef,
   NotFoundException, BadRequestException, ForbiddenException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { BookingStatus, type Booking, type Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -73,28 +74,42 @@ export class BookingsService {
     do { reference = this.generateReference(); }
     while (await this.prisma.booking.findUnique({ where: { reference } }));
 
-    const booking = await this.prisma.booking.create({
-      data: {
-        reference, userId,
-        hotelId:    dto.hotelId,
-        resourceId: dto.resourceId,
-        checkIn:    checkInDate,
-        checkOut:   checkOutDate,
-        nights,
-        guests:         dto.guests,
-        guestFirstName: dto.guestFirstName,
-        guestLastName:  dto.guestLastName,
-        guestEmail:     dto.guestEmail,
-        guestPhone:     dto.guestPhone,
-        specialRequests: dto.specialRequests,
-        status:         BookingStatus.HELD,
-        subtotalNgn:    pricing.subtotalNgn,
-        serviceFeeNgn:  pricing.serviceFeeNgn,
-        totalNgn:       pricing.totalNgn,
-        heldUntil:      new Date(Date.now() + 10 * 60 * 1000),
-      },
-      include: bookingInclude,
-    });
+    let booking: Booking;
+    try {
+      booking = await this.prisma.booking.create({
+        data: {
+          reference, userId,
+          hotelId:    dto.hotelId,
+          resourceId: dto.resourceId,
+          checkIn:    checkInDate,
+          checkOut:   checkOutDate,
+          nights,
+          guests:         dto.guests,
+          guestFirstName: dto.guestFirstName,
+          guestLastName:  dto.guestLastName,
+          guestEmail:     dto.guestEmail,
+          guestPhone:     dto.guestPhone,
+          specialRequests: dto.specialRequests,
+          status:         BookingStatus.HELD,
+          subtotalNgn:    pricing.subtotalNgn,
+          serviceFeeNgn:  pricing.serviceFeeNgn,
+          totalNgn:       pricing.totalNgn,
+          heldUntil:      new Date(Date.now() + 10 * 60 * 1000),
+        },
+        include: bookingInclude,
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // Prisma P2022: column not found — migration hasn't been applied yet
+      if (msg.includes('P2022') || msg.includes('column') || msg.includes('resourceId')) {
+        throw new InternalServerErrorException(
+          'Database migration pending. The resourceId column does not exist yet. ' +
+          'Run: npx prisma migrate deploy',
+        );
+      }
+      this.logger.error('[BOOKING] create failed', msg);
+      throw new InternalServerErrorException('Failed to create booking. Please try again.');
+    }
 
     this.notificationsGateway.notifyNewOrder(dto.hotelId, {
       bookingId: booking.id,
