@@ -15,7 +15,7 @@ const hotelSearchInclude = {
   roomTypes: { where: { isActive: true } },
   resources: {
     where: { lifecycleStatus: 'ACTIVE', isBookable: true, marketplaceVisibility: 'PUBLIC' },
-    select: { id: true },
+    select: { id: true, pricePerNight: true },
   },
   reviews: { select: { overallRating: true } },
   _count: { select: { reviews: true } },
@@ -56,7 +56,14 @@ export class SearchService {
       primaryImageUrl: hotel.images[0]?.url ?? null,
       amenities: hotel.amenities.map((a) => a.amenity.name),
       lowestPrice:
-        hotel.roomTypes.length > 0
+        hotel.resources && hotel.resources.length > 0
+          ? (() => {
+              const prices = (hotel.resources as { pricePerNight: { toNumber?: () => number } | null }[])
+                .map(r => r.pricePerNight ? (typeof r.pricePerNight === 'object' && r.pricePerNight.toNumber ? r.pricePerNight.toNumber() : Number(r.pricePerNight)) : null)
+                .filter((p): p is number => p !== null && p > 0);
+              return prices.length > 0 ? Math.min(...prices) : null;
+            })()
+          : hotel.roomTypes && hotel.roomTypes.length > 0
           ? Math.min(...hotel.roomTypes.map((r) => Number(r.pricePerNight)))
           : null,
       availableRooms,
@@ -326,7 +333,7 @@ export class SearchService {
             ? String((r.attributes as Record<string, unknown>)['bedConfiguration'])
             : r.category.name,
           capacity: r.capacity ?? 1,
-          pricePerNight: 0,
+          pricePerNight: r.pricePerNight ? Number(r.pricePerNight) : 0,
           availableRooms: available ? 1 : 0,
           available,
           images: r.images.map((img) => ({ url: img.url, isPrimary: img.isPrimary, caption: img.caption })),

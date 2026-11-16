@@ -5,6 +5,7 @@ import {
   IsBoolean,
   IsEnum,
   IsObject,
+  IsNumber,
   MinLength,
   Min,
 } from 'class-validator';
@@ -107,4 +108,10 @@ export class CreateResourceDto {
   @IsString()
   @IsOptional()
   internalNotes?: string;
+
+  @ApiPropertyOptional({ example: 45000, description: 'Base price per booking unit in NGN (e.g. per night, per hour)' })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  pricePerNight?: number;
 }
