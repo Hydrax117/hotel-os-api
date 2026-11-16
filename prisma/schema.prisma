@@ -298,13 +298,14 @@ model Booking {
   subtotalNgn        Decimal       @db.Decimal(12, 2)
   serviceFeeNgn      Decimal       @db.Decimal(12, 2)
   totalNgn           Decimal       @db.Decimal(12, 2)
-  heldUntil          DateTime?
-  confirmedAt        DateTime?
-  cancelledAt        DateTime?
-  cancellationReason String?
-  isWalkIn           Boolean       @default(false)
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
+  heldUntil             DateTime?
+  confirmedAt           DateTime?
+  cancelledAt           DateTime?
+  cancellationReason    String?
+  isWalkIn              Boolean                @default(false)
+  walkInPaymentMethod   WalkInPaymentMethod?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
 
   payment            Payment?
   review             Review?
@@ -336,6 +337,15 @@ enum BookingStatus {
   CANCELLED
   NO_SHOW
   FAILED
+}
+
+enum WalkInPaymentMethod {
+  CASH
+  POS
+  BANK_TRANSFER
+  MOBILE_MONEY
+  CHEQUE
+  OTHER
 }
 
 model Payment {

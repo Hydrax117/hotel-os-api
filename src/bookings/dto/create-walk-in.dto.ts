@@ -6,8 +6,10 @@ import {
   Min,
   IsOptional,
   MinLength,
+  IsEnum,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { WalkInPaymentMethod } from '@prisma/client';
 
 export class CreateWalkInDto {
   @ApiProperty({ example: 'resource-id' })
@@ -44,6 +46,10 @@ export class CreateWalkInDto {
   @ApiProperty({ example: '+2348012345678' })
   @IsString()
   guestPhone: string;
+
+  @ApiProperty({ enum: WalkInPaymentMethod, example: WalkInPaymentMethod.CASH })
+  @IsEnum(WalkInPaymentMethod)
+  walkInPaymentMethod: WalkInPaymentMethod;
 
   @ApiPropertyOptional({ example: 'Non-smoking room please' })
   @IsString()

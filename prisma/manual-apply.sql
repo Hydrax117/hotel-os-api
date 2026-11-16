@@ -256,5 +256,14 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 CREATE INDEX IF NOT EXISTS "Booking_resourceId_idx" ON "Booking"("resourceId");
 
+-- ─── Walk-in payment method ───────────────────────────────────────────────────
+
+DO $$ BEGIN
+  CREATE TYPE "WalkInPaymentMethod" AS ENUM ('CASH', 'POS', 'BANK_TRANSFER', 'MOBILE_MONEY', 'CHEQUE', 'OTHER');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+ALTER TABLE "Booking"
+  ADD COLUMN IF NOT EXISTS "walkInPaymentMethod" "WalkInPaymentMethod";
+
 -- ─── Done ─────────────────────────────────────────────────────────────────────
 -- All tables and columns created. Restart the API server after running this.
