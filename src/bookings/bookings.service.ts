@@ -3,7 +3,7 @@ import {
   NotFoundException, BadRequestException, ForbiddenException,
   InternalServerErrorException,
 } from '@nestjs/common';
-import { BookingStatus, type Booking, type Prisma } from '@prisma/client';
+import { BookingStatus, WalkInPaymentMethod, type Booking, type Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { InventoryService } from '../inventory/inventory.service.js';
 import { NotificationsGateway } from '../notifications/notifications.gateway.js';
@@ -346,6 +346,7 @@ export class BookingsService {
         totalNgn:       pricing.totalNgn,
         confirmedAt:    new Date(),
         isWalkIn:       true,
+        walkInPaymentMethod: dto.walkInPaymentMethod,
       },
       include: bookingInclude,
     });
